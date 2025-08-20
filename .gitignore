@@ -1,3 +1,22 @@
+# Haxe / HaxeFlixel / hxcpp / OpenFL
+Export/
+export/
+bin/
+obj/
 .haxelib/
-.haxelsp/recording/
-dump/
+.haxe/
+.hxml
+*.hl
+*.ndll
+*.exe
+*.dll
+*.pdb
+*.lib
+
+# Editor junk
+.vscode/
+.idea/
+*.iml
+
+external/
+logs/

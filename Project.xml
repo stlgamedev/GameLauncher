@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<project xmlns="http://lime.openfl.org/project/1.0.4"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
+
+	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="0.1.0" company="STLGameDev" />
+
+	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
+	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
+
+	<set name="BUILD_DIR" value="export" />
+	<source path="source" />
+	<assets path="assets" />
+
+	<haxelib name="flixel" />
+
+	<haxedef name="FLX_NO_HEALTH" />
+
+	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
+
+	<haxedef name="HXCPP_STACK_TRACE" if="debug" />
+
+	<haxedef name="FLX_NO_DEBUG" unless="debug" />
+	<!-- Haxe 4.3.0+: Enable pretty syntax errors and stuff. -->
+	<!-- pretty (haxeflixel default), indent, classic (haxe compiler default) -->
+	<haxedef name="message.reporting" value="pretty" />
+
+	<!-- Icon (optional) -->
+	<!-- <icon path="assets/icon/icon.png" /> -->
+</project>
