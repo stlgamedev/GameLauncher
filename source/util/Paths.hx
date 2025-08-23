@@ -1,24 +1,32 @@
 package util;
 
+import haxe.io.Path;
 import sys.FileSystem;
 
 class Paths {
-    public static inline var EXTERNAL_ROOT = "external";
-    public static inline var DIR_GAMES    = EXTERNAL_ROOT + "/games";
-    public static inline var DIR_TRAILERS = EXTERNAL_ROOT + "/trailers";
+	public static var DIR_LOGS = "logs";
+	public static var DIR_GAMES = "";
+	public static var DIR_TRAILERS = "";
 
-    // Logs at repo root now:
-    public static inline var DIR_LOGS     = "logs";
+	// 1) Only logs (safe pre-config)
+	public static function ensureLogs():Void
+	{
+		ensureDir(DIR_LOGS);
+	}
 
-    public static inline var CFG_FILE     = "settings.cfg";
+	// 2) Content dirs (needs cfg)
+	public static function ensureContent():Void
+	{
+		final root = normalize(Path.join([Globals.cfg.contentRootDir]));
+		DIR_GAMES = Path.join([root, "games"]);
+		DIR_TRAILERS = Path.join([root, "trailers"]);
+		ensureDir(root);
+		ensureDir(DIR_GAMES);
+		ensureDir(DIR_TRAILERS);
+	}
 
-    public static function ensureAll():Void {
-        ensureDir(EXTERNAL_ROOT);
-        ensureDir(DIR_GAMES);
-        ensureDir(DIR_TRAILERS);
-        ensureDir(DIR_LOGS);
-    }
-
+	static inline function normalize(p:String):String
+		return Path.normalize(p);
     static function ensureDir(p:String):Void {
         if (!FileSystem.exists(p)) FileSystem.createDirectory(p);
     }

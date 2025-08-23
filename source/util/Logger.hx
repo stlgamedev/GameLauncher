@@ -1,8 +1,16 @@
 package util;
 
 import haxe.io.Path;
+import sys.FileSystem;
 import sys.io.File;
 import sys.io.FileOutput;
+import util.Globals;
+
+class Log
+{
+	public static inline function line(s:String)
+		return Globals.log.line(s);
+}
 
 class Logger {
     var out:FileOutput;
@@ -10,8 +18,10 @@ class Logger {
 
     public function new() {
         dayStamp = todayStamp();
-        final logPath = Path.join([Paths.DIR_LOGS, 'glh-' + dayStamp + '.log']);
-        out = File.append(logPath, true); // append-only
+		if (!FileSystem.exists(Paths.DIR_LOGS))
+			FileSystem.createDirectory(Paths.DIR_LOGS);
+		final logPath = Path.join([Paths.DIR_LOGS, 'gl-' + dayStamp + '.log']);
+		out = File.append(logPath, true);
         line("=== Launcher started (build " + getBuildStamp() + ") ===");
     }
 

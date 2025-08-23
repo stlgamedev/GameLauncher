@@ -4,27 +4,34 @@ import flixel.FlxGame;
 import openfl.display.Sprite;
 import themes.ThemeLoader;
 import util.Config;
+import util.GameIndex;
+import util.Globals;
+import util.Logger.Log;
 import util.Logger;
 import util.Paths;
 
-class Main extends Sprite {
-    public function new() {
-        super();
+class Main extends Sprite
+{
+	public function new()
+	{
+		super();
 
-        Paths.ensureAll();
-        final log = new Logger();
-        final cfg = Config.loadOrCreate(log);
-        final themeId = ThemeLoader.currentThemeId(cfg.theme);
-        log.line("[THEME] Using theme: " + themeId);
+		Paths.ensureLogs();
+		Globals.log = new Logger();
+		Log.line("[BOOT] Logs ready.");
 
-        final width  = 1920;
-        final height = 1080;
-        final updateFPS = 60;
-        final drawFPS   = 60;
-        final skipSplash = true;
+		Globals.cfg = util.Config.loadOrCreate();
+		Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir);
 
-        // HF 6.1 signature: (w,h,state,updateFPS,drawFPS,skipSplash)
-        addChild(new FlxGame(width, height, () -> new GameSelectState(cfg, log), updateFPS, drawFPS, skipSplash));
+		// Phase C: Ensure content dirs based on config
+		Paths.ensureContent();
+		Log.line("[BOOT] Content dirs ensured.");
 
-    }
+		// Phase D: (Phase 1‑A) discover games
+		util.Globals.games = util.GameIndex.scanGames();
+		Log.line("[BOOT] Discovered " + Globals.games.length + " game(s).");
+
+		// ... continue to FlxGame
+		addChild(new flixel.FlxGame(1920, 1080, () -> new GameSelectState(), 60, 60, true));
+	}
 }

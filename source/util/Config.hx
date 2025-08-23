@@ -4,6 +4,8 @@ import StringTools;
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
+import util.Globals;
+import util.Logger.Log;
 
 /**
  * Launcher configuration loader/writer.
@@ -49,18 +51,20 @@ class Config
 	public var scheduleDaily:String; // "HH:MM"
 	public var serverBase:String; // URL
 
+	public static var CFG_FILE = "settings.cfg";
+
 	public function new() {}
 
 	// ---------------- Public API ----------------
 
-	public static function loadOrCreate(log:Logger):Config
+	public static function loadOrCreate():Config
 	{
 		// If settings.cfg is missing, write defaults and return defaults object
-		if (!FileSystem.exists(Paths.CFG_FILE))
+		if (!FileSystem.exists(CFG_FILE))
 		{
 			var c = defaults();
 			// ensure parent dir exists
-			var cfgDir = Path.directory(Paths.CFG_FILE);
+			var cfgDir = Path.directory(CFG_FILE);
 			if (cfgDir != "" && !FileSystem.exists(cfgDir))
 			{
 				try
@@ -71,15 +75,15 @@ class Config
 			}
 			try
 			{
-				File.saveContent(Paths.CFG_FILE, defaultsIni());
-				log.line("[CFG] Created default " + Paths.CFG_FILE);
+				File.saveContent(CFG_FILE, defaultsIni());
+				Log.line("[CFG] Created default " + CFG_FILE);
 			}
 			catch (e:Dynamic)
 			{
-				log.line("[CFG][ERROR] Failed to write defaults: " + Std.string(e));
+				Log.line("[CFG][ERROR] Failed to write defaults: " + Std.string(e));
 			}
 			// normalize paths before returning
-			finalizePaths(c, log);
+			finalizePaths(c);
 			return c;
 		}
 
@@ -87,18 +91,18 @@ class Config
 		var text = "";
 		try
 		{
-			text = File.getContent(Paths.CFG_FILE);
+			text = File.getContent(CFG_FILE);
 		}
 		catch (e:Dynamic)
 		{
-			log.line("[CFG][ERROR] Could not read " + Paths.CFG_FILE + ": " + Std.string(e));
+			Log.line("[CFG][ERROR] Could not read " + CFG_FILE + ": " + Std.string(e));
 			var c = defaults();
-			finalizePaths(c, log);
+			finalizePaths(c);
 			return c;
 		}
 
-		var cfg = fromIni(text, log);
-		finalizePaths(cfg, log);
+		var cfg = fromIni(text);
+		finalizePaths(cfg);
 		return cfg;
 	}
 
@@ -114,12 +118,12 @@ class Config
 		c.hotkey = "SHIFT+F12";
 		c.logsRollDaily = true;
 
-        #if debug
-        // force external path for debug builds
-        c.contentRootDir = normalizePath("P:\\LauncherExternals\\");
-        #else
-        c.contentRootDir = "external";
-        #end
+		#if debug
+		// force external path for debug builds
+		c.contentRootDir = normalizePath("P:\\LauncherExternals\\");
+		#else
+		c.contentRootDir = "external";
+		#end
 
 		c.logsRoot = "logs";
 
@@ -133,26 +137,19 @@ class Config
 
 	static function defaultsIni():String
 	{
-		return "[General]\n" + 
-                    "mode = normal\n" + 
-                    "theme = default\n" + 
-                    "idle_seconds_menu = 180\n" + 
-                    "idle_seconds_game = 300\n" + 
-                    "hotkey = SHIFT+F12\n" + 
-                    "logs_roll_daily = true\n\n" + 
-                "[Paths]\n" + 
-                    "content_root = external\n" + 
-                    "logs_root = logs\n\n" + 
-                "[Content]\n" + 
-                    "subscriptions = ArcadeJam01\n\n" + 
-                "[Update]\n" + 
-                    "auto_update = false\n" + 
-                    "check_on_boot = true\n" + 
-                    "schedule_daily = 08:00\n" + 
-                    "server_base = https://sgd.axolstudio.com/launcher\n";
+		#if debug
+		var debugContent = "P:\\LauncherExternals\\";
+		#else
+		var debugContent = "external";
+		#end
+
+		return "[General]\n" + "mode = normal\n" + "theme = default\n" + "idle_seconds_menu = 180\n" + "idle_seconds_game = 300\n" + "hotkey = SHIFT+F12\n"
+			+ "logs_roll_daily = true\n\n" + "[Paths]\n" + "content_root = " + debugContent + "\n" + "logs_root = logs\n\n" + "[Content]\n"
+			+ "subscriptions = ArcadeJam01\n\n" + "[Update]\n" + "auto_update = false\n" + "check_on_boot = true\n" + "schedule_daily = 08:00\n"
+			+ "server_base = https://sgd.axolstudio.com/launcher\n";
 	}
 
-	static function fromIni(ini:String, log:Logger):Config
+	static function fromIni(ini:String):Config
 	{
 		var c = defaults();
 		var section = "";
@@ -221,19 +218,19 @@ class Config
 			}
 		}
 
-		log.line('[CFG] Loaded: mode=${c.mode}, theme=${c.theme}, content_root=${c.contentRootDir}, logs_root=${c.logsRoot}');
+		Log.line('[CFG] Loaded: mode=${c.mode}, theme=${c.theme}, content_root=${c.contentRootDir}, logs_root=${c.logsRoot}');
 		return c;
 	}
 
-	static function finalizePaths(c:Config, log:Logger):Void
+	static function finalizePaths(c:Config):Void
 	{
 		// Normalize/absolutize paths; if relative, make them relative to the working dir
 		c.contentRootDir = normalizePath(c.contentRootDir);
 		c.logsRoot = normalizePath(c.logsRoot);
 
 		// Ensure directories exist
-		ensureDir(c.contentRootDir, log);
-		ensureDir(c.logsRoot, log);
+		ensureDir(c.contentRootDir);
+		ensureDir(c.logsRoot);
 	}
 
 	// ---------------- Helpers ----------------
@@ -303,7 +300,7 @@ class Config
 		return fallback;
 	}
 
-	static function normalizePath(p:String):String
+	static public function normalizePath(p:String):String
 	{
 		if (p == null || p == "")
 			return "";
@@ -322,7 +319,7 @@ class Config
 		return Path.normalize(full);
 	}
 
-	static function ensureDir(dir:String, log:Logger):Void
+	static function ensureDir(dir:String):Void
 	{
 		if (dir == null || dir == "")
 			return;
@@ -331,16 +328,16 @@ class Config
 			if (!FileSystem.exists(dir))
 			{
 				FileSystem.createDirectory(dir);
-				log.line("[CFG] Created directory: " + dir);
+				Log.line("[CFG] Created directory: " + dir);
 			}
 			else if (!FileSystem.isDirectory(dir))
 			{
-				log.line("[CFG][WARN] Path exists but is not a directory: " + dir);
+				Log.line("[CFG][WARN] Path exists but is not a directory: " + dir);
 			}
 		}
 		catch (e:Dynamic)
 		{
-			log.line("[CFG][ERROR] Could not ensure directory: " + dir + " :: " + Std.string(e));
+			Log.line("[CFG][ERROR] Could not ensure directory: " + dir + " :: " + Std.string(e));
 		}
 	}
 }
