@@ -1,23 +1,8 @@
 package util;
 
-import haxe.Json;
-import haxe.io.Path;
-import sys.FileSystem;
-import sys.io.File;
-import util.Globals;
-import util.Logger.Log;
+
 
 using StringTools;
-
-typedef GameEntry =
-{
-	id:String,
-	title:String,
-	developers:Array<String>,
-	year:Int,
-	description:String,
-	genres:Array<String>
-}
 
 class GameIndex
 {
@@ -72,7 +57,7 @@ class GameIndex
 
 				var year:Int = 0;
 				if (data.year != null)
-					year = Std.parseInt(data.year);
+					year = data.year;
 
 				var desc:String = strOrEmpty(data.description);
 
@@ -92,14 +77,7 @@ class GameIndex
 					return g.trim();
 				});
 
-				games.push({
-					id: name,
-					title: title,
-					developers: devs,
-					year: year,
-					description: desc,
-					genres: genres
-				});
+				games.push(new GameEntry(name, title, devs, desc, year, genres));
 			}
 		}
 		return games;

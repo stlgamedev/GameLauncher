@@ -1,11 +1,6 @@
 package util;
 
-import StringTools;
-import haxe.io.Path;
-import sys.FileSystem;
-import sys.io.File;
-import util.Globals;
-import util.Logger.Log;
+
 
 /**
  * Launcher configuration loader/writer.

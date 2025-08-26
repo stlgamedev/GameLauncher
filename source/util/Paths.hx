@@ -1,7 +1,5 @@
 package util;
 
-import haxe.io.Path;
-import sys.FileSystem;
 
 class Paths {
 	public static var DIR_LOGS = "logs";

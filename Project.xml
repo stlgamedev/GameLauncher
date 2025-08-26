@@ -12,17 +12,29 @@
 	<assets path="assets" />
 
 	<haxelib name="flixel" />
+<haxelib name="openfl-aseprite" />
+
+
 
 	<haxedef name="FLX_NO_HEALTH" />
 
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
 
 	<haxedef name="HXCPP_STACK_TRACE" if="debug" />
+<haxedef name="HXCPP_STACK_LINE" if="debug" />
+
 
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
-	<!-- Haxe 4.3.0+: Enable pretty syntax errors and stuff. -->
-	<!-- pretty (haxeflixel default), indent, classic (haxe compiler default) -->
-	<haxedef name="message.reporting" value="pretty" />
+<architecture name="x64" if="windows" />
+
+<haxedef name="dce=full" if="release" />
+<haxedef name="HXCPP_STRIP" if="release" />
+<haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
+
+<haxedef name="no-console" if="windows" />
+<haxedef name="noInlineImport" />
+
+
 
 	<!-- Icon (optional) -->
 	<!-- <icon path="assets/icon/icon.png" /> -->
