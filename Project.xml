@@ -15,7 +15,6 @@
 <haxelib name="openfl-aseprite" />
 
 
-
 	<haxedef name="FLX_NO_HEALTH" />
 
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
@@ -24,15 +23,19 @@
 <haxedef name="HXCPP_STACK_LINE" if="debug" />
 
 
+
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
 <architecture name="x64" if="windows" />
+
 
 <haxedef name="dce=full" if="release" />
 <haxedef name="HXCPP_STRIP" if="release" />
 <haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
 
+
 <haxedef name="no-console" if="windows" />
 <haxedef name="noInlineImport" />
+
 
 
 

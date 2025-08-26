@@ -9,8 +9,6 @@ class GameIndex
 	public static function scanGames():Array<GameEntry>
 	{
 		var games:Array<GameEntry> = [];
-		trace("GameIndex.scanGames: Scanning games in " + Paths.DIR_GAMES);
-		trace(safeReadDir(Paths.DIR_GAMES));
 		for (name in safeReadDir(Paths.DIR_GAMES))
 		{
 			if (name.length == 0 || name.charAt(0) == '.')

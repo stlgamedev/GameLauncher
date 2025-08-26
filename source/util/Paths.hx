@@ -5,6 +5,7 @@ class Paths {
 	public static var DIR_LOGS = "logs";
 	public static var DIR_GAMES = "";
 	public static var DIR_TRAILERS = "";
+	public static var DIR_THEMES = "";
 
 	// 1) Only logs (safe pre-config)
 	public static function ensureLogs():Void
@@ -18,9 +19,11 @@ class Paths {
 		final root = normalize(Path.join([Globals.cfg.contentRootDir]));
 		DIR_GAMES = Path.join([root, "games"]);
 		DIR_TRAILERS = Path.join([root, "trailers"]);
+		DIR_THEMES = Path.join([root, "themes"]);
 		ensureDir(root);
 		ensureDir(DIR_GAMES);
 		ensureDir(DIR_TRAILERS);
+		ensureDir(DIR_THEMES);
 	}
 
 	static inline function normalize(p:String):String

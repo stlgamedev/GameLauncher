@@ -107,7 +107,6 @@ class Config
 	{
 		var c = new Config();
 		c.mode = "normal";
-		c.theme = "default";
 		c.idleSecondsMenu = 180;
 		c.idleSecondsGame = 300;
 		c.hotkey = "SHIFT+F12";
@@ -116,8 +115,10 @@ class Config
 		#if debug
 		// force external path for debug builds
 		c.contentRootDir = normalizePath("P:\\LauncherExternals\\");
+		c.theme = "arcade-jam-2017";
 		#else
 		c.contentRootDir = "external";
+		c.theme = "default";
 		#end
 
 		c.logsRoot = "logs";
@@ -134,11 +135,14 @@ class Config
 	{
 		#if debug
 		var debugContent = "P:\\LauncherExternals\\";
+		var theme = "arcade-jam-2017";
 		#else
 		var debugContent = "external";
+		var theme = "default";
 		#end
 
-		return "[General]\n" + "mode = normal\n" + "theme = default\n" + "idle_seconds_menu = 180\n" + "idle_seconds_game = 300\n" + "hotkey = SHIFT+F12\n"
+		return "[General]\n" + "mode = normal\n" + "theme = " + theme + "\n" + "idle_seconds_menu = 180\n" + "idle_seconds_game = 300\n"
+			+ "hotkey = SHIFT+F12\n"
 			+ "logs_roll_daily = true\n\n" + "[Paths]\n" + "content_root = " + debugContent + "\n" + "logs_root = logs\n\n" + "[Content]\n"
 			+ "subscriptions = ArcadeJam01\n\n" + "[Update]\n" + "auto_update = false\n" + "check_on_boot = true\n" + "schedule_daily = 08:00\n"
 			+ "server_base = https://sgd.axolstudio.com/launcher\n";

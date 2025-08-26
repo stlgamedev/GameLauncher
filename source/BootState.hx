@@ -1,6 +1,6 @@
 package;
 
-import flixel.util.FlxDestroyUtil;
+
 
 class BootState extends FlxState
 {
@@ -89,18 +89,23 @@ class BootState extends FlxState
 				Globals.log.line("[BOOT] Discovered " + Globals.games.length + " game(s).");
 				stepDone("Scan games");
 			case 4:
+				Globals.theme = Theme.load(Path.join([Paths.DIR_THEMES, Globals.cfg.theme]));
+				Globals.theme.preloadAssets();
+				// Globals.theme = Theme.load(Globals.cfg.themeDir);
+				stepDone("Load theme");
+			case 5:
 				// Preload box art (Flixel cache)
 				Preload.preloadGamesBoxArt(Globals.games);
 				// small grace period so first cover likely shows
 				waitUntil = FlxG.game.ticks / 1000 + 0.5; // ~500ms
 				stepDone("Preload covers (kickoff)");
-			case 5:
+			case 6:
 				// Wait until either all covers cached or we hit the time budget
 				if (coversReady() || (FlxG.game.ticks / 1000) >= waitUntil)
 				{
 					stepDone("Preload covers (settled)");
 				}
-			case 6:
+			case 7:
 				// Go!
 				FlxG.switchState(() -> new GameSelectState());
 		}
