@@ -11,6 +11,7 @@
 	<source path="source" />
 	<assets path="assets" />
 
+
 	<haxelib name="flixel" />
 <haxelib name="openfl-aseprite" />
 
@@ -26,6 +27,8 @@
 
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
 <architecture name="x64" if="windows" />
+
+<haxedef name="import" value="Import" />
 
 
 <haxedef name="dce=full" if="release" />
