@@ -1,5 +1,15 @@
 package themes;
 
+import haxe.Json;
+import haxe.io.Path;
+import sys.FileSystem;
+import sys.io.File;
+import flixel.FlxBasic;
+import flixel.FlxSprite;
+import flixel.FlxState;
+import flixel.text.FlxText;
+import flixel.util.FlxColor;
+
 /** ===== Spec ===== */
 typedef ThemeSpec =
 {
@@ -10,16 +20,16 @@ typedef ThemeSpec =
 
 typedef ThemeElementSpec =
 {
-	var name:String; // e.g., "title", "cover"
-	var type:String; // "text" | "graphic" | "rect" | (future: "shader","carousel")
-	@:optional var source:String; // for "graphic" (file path or %BOX% / %BOX-1%)
-	@:optional var content:String; // for "text" (can include %TITLE% / %TITLE+1%)
-	@:optional var pos:String; // "x,y" where x/y can use w/h math (e.g., "w-420, 120")
-	@:optional var size:String; // "w,h" box to fit into; for text only width matters
-	@:optional var align:String; // "left"|"center"|"right"
-	@:optional var color:String; // "#RRGGBB" or "#AARRGGBB" or CSS name
-	@:optional var pointSize:Int; // text size
-	@:optional var params:Dynamic; // freeform (e.g., {"font":"ui_heading.ttf"})
+	var name:String;
+	var type:String; // "text"|"graphic"|"rect"|"carousel"|"vortex"
+	@:optional var source:String;
+	@:optional var content:String;
+	@:optional var pos:String;
+	@:optional var size:String;
+	@:optional var align:String;
+	@:optional var color:String;
+	@:optional var pointSize:Int;
+	@:optional var params:Dynamic;
 	@:optional var initialVisible:Null<Bool>;
 }
 
@@ -29,8 +39,6 @@ typedef Context =
 	var w:Int;
 	var h:Int;
 	var themeDir:String;
-
-	/** Resolve %VARNAME% with optional +/- offset */
 	var resolveVar:(name:String, offset:Int) -> String;
 }
 
@@ -43,7 +51,7 @@ interface IThemeNode
 	public function update(ctx:Context):Void;
 }
 
-/** ===== Theme (loader + node factory + utils) ===== */
+/** ===== Theme ===== */
 class Theme
 {
 	public var dir:String;
@@ -56,58 +64,26 @@ class Theme
 		this.spec = spec;
 	}
 
-	public function getNodeByName(n:String):IThemeNode
-	{
-		for (n0 in nodes)
-			if (n0.name == n)
-				return n0;
-		return null;
-	}
-
 	public static function load(themeDir:String):Theme
 	{
-		final jsonPath = Path.join([themeDir, "theme.json"]);
-		final txt = File.getContent(jsonPath);
-		final spec:ThemeSpec = Json.parse(txt);
+		var jsonPath = Path.join([themeDir, "theme.json"]);
+		var txt = File.getContent(jsonPath);
+		var spec:ThemeSpec = Json.parse(txt);
 		return new Theme(themeDir, spec);
 	}
 
 	public function preloadAssets():Void
 	{
-		// Only pre-add non-placeholder graphics so first draw is smooth.
+		// graphics only; everything else is dynamic
 		for (el in spec.elements)
 		{
-			if (el.type == "graphic" && el.source != null && el.source.length > 0 && el.source.charAt(0) != "%")
+			if (el.type == "graphic" && el.source != null && el.source != "" && el.source.charAt(0) != "%")
 			{
-				final abs = resolve(el.source);
-				#if sys
-				if (!sys.FileSystem.exists(abs))
-				{
+				var abs = resolve(el.source);
+				if (!FileSystem.exists(abs))
 					util.Logger.Log.line("[THEME] Missing asset (preload): " + abs);
-					continue;
-				}
-				var gr = flixel.FlxG.bitmap.get(abs);
-				if (gr == null)
-				{
-					try
-					{
-						var bd = openfl.display.BitmapData.fromFile(abs);
-						if (bd != null)
-						{
-							gr = flixel.FlxG.bitmap.add(bd, false, abs);
-							if (gr != null)
-							{
-								gr.destroyOnNoUse = false;
-								gr.persist = true;
-							}
-						}
-					}
-					catch (e:Dynamic)
-					{
-						util.Logger.Log.line("[THEME] Preload failed: " + abs + " :: " + Std.string(e));
-					}
-				}
-				#end
+				else
+					addToFlixelCache(abs);
 			}
 		}
 	}
@@ -117,15 +93,15 @@ class Theme
 		nodes = [];
 		for (el in spec.elements)
 		{
-			final node:IThemeNode = switch (el.type)
+			var node:IThemeNode = switch (el.type)
 			{
 				case "text": new TextNode(el, this);
 				case "graphic": new GraphicNode(el, this);
 				case "rect": new RectNode(el);
 				case "carousel": new CarouselNode(el, this);
-
+				case "vortex": new VortexNode(el, this);
 				default: null;
-			}
+			};
 			if (node != null)
 			{
 				node.addTo(state);
@@ -140,7 +116,16 @@ class Theme
 			n.update(ctx);
 	}
 
-	/** Resolve relative-to-theme path to absolute. */
+	/** Allow states to grab a node by name (e.g., vortex to nudge) */
+	public function getNodeByName<T:IThemeNode>(name:String):Null<T>
+	{
+		for (n in nodes)
+			if (n.name == name)
+				return cast n;
+		return null;
+	}
+
+	/** Resolve a theme-relative path. */
 	public inline function resolve(relOrAbs:String):String
 	{
 		if (relOrAbs == null || relOrAbs == "")
@@ -150,67 +135,64 @@ class Theme
 		return Path.join([dir, relOrAbs]);
 	}
 
-	/** Minimal absolute path check (Windows + *nix) */
 	static inline function isAbsolute(p:String):Bool
 	{
 		if (p == null || p == "")
 			return false;
-		final c0 = p.charAt(0);
+		var c0 = p.charAt(0);
 		if (c0 == "/" || c0 == "\\")
-			return true; // *nix or UNC
+			return true;
 		if (p.length >= 2 && p.charAt(1) == ":")
-			return true; // Windows "C:\"
+			return true;
 		return false;
 	}
 
-	/** Expand %KEY% or %KEY+1% / %KEY-2% using ctx.resolveVar. Unknowns -> "" */
-	public static inline function expandWithOffsets(s:String, ctx:Context):String
+	// ---------- param helpers (robust for String/Float/Int JSON) ----------
+	public static function pFloat(obj:Dynamic, key:String, def:Float):Float
 	{
-		if (s == null)
-			return null;
-		var out = new StringBuf();
-		var i = 0;
-		while (i < s.length)
+		if (obj == null || !Reflect.hasField(obj, key))
+			return def;
+		var v:Dynamic = Reflect.field(obj, key);
+		if (Std.isOfType(v, Float))
+			return (v : Float);
+		if (Std.isOfType(v, Int))
+			return (v : Int);
+		if (Std.isOfType(v, String))
 		{
-			var c = s.charAt(i);
-			if (c == "%" && i + 1 < s.length)
-			{
-				var j = i + 1;
-				while (j < s.length && s.charAt(j) != "%")
-					j++;
-				if (j < s.length && s.charAt(j) == "%")
-				{
-					var token = s.substr(i + 1, j - i - 1); // e.g., TITLE, BOX-1, YEAR+2
-					var name = token;
-					var off = 0;
-					var plus = token.lastIndexOf("+");
-					var minus = token.lastIndexOf("-");
-					var idx = (plus > 0) ? plus : (minus > 0 ? minus : -1);
-					if (idx > 0)
-					{
-						name = token.substr(0, idx);
-						off = Std.parseInt(token.substr(idx)); // includes sign
-						if (Math.isNaN(off))
-							off = 0;
-					}
-					var val = ctx.resolveVar(name, off);
-					out.add(val != null ? val : "");
-					i = j + 1;
-					continue;
-				}
-			}
-			out.add(c);
-			i++;
+			var f = Std.parseFloat((v : String));
+			return Math.isNaN(f) ? def : f;
 		}
-		return out.toString();
+		return def;
 	}
 
-	/* ===== simple numeric expr parser for pos/size (w/h math) ===== */
+	public static function pInt(obj:Dynamic, key:String, def:Int, min:Int = -0x3fffffff, max:Int = 0x3fffffff):Int
+	{
+		if (obj == null || !Reflect.hasField(obj, key))
+			return def;
+		var v:Dynamic = Reflect.field(obj, key);
+		var out:Int = def;
+		if (Std.isOfType(v, Int))
+			out = v;
+		else if (Std.isOfType(v, Float))
+			out = Std.int(v);
+		else if (Std.isOfType(v, String))
+		{
+			var p = Std.parseInt((v : String));
+			out = (p == null) ? def : p;
+		}
+		if (out < min)
+			out = min;
+		if (out > max)
+			out = max;
+		return out;
+	}
+
+	// ---------- math/placement helpers ----------
 	public static inline function evalExpr(expr:String, w:Int, h:Int):Int
 	{
 		if (expr == null)
 			return 0;
-		var e = expr.trim();
+		var e = StringTools.trim(expr);
 		e = e.split("w").join(Std.string(w)).split("h").join(Std.string(h));
 		var total = 0.0;
 		var sign = 1.0;
@@ -220,49 +202,93 @@ class Theme
 			var ch = e.charAt(i);
 			if (ch == "+")
 			{
-				sign = 1.0;
+				sign = 1;
 				i++;
 				continue;
 			}
 			if (ch == "-")
 			{
-				sign = -1.0;
+				sign = -1;
 				i++;
 				continue;
 			}
 			var j = i;
 			while (j < e.length && e.charAt(j) != "+" && e.charAt(j) != "-")
 				j++;
-			var term = e.substr(i, j - i).trim();
-			var val = parseMulDiv(term);
-			total += sign * val;
+			var term = StringTools.trim(e.substr(i, j - i));
+			var mul = 1.0;
+			for (part in term.split("*"))
+			{
+				var sub = part.split("/");
+				var v = Std.parseFloat(StringTools.trim(sub[0]));
+				if (Math.isNaN(v))
+					v = 0;
+				for (k in 1...sub.length)
+				{
+					var d = Std.parseFloat(StringTools.trim(sub[k]));
+					if (d == 0)
+						d = 1;
+					v /= d;
+				}
+				mul *= v;
+			}
+			total += sign * mul;
 			i = j;
 		}
 		return Std.int(total);
 	}
 
-	static inline function parseMulDiv(term:String):Float
+	// Inside class Theme
+	public static inline function expandWithOffsets(s:String, ctx:Context):String
 	{
-		if (term == "")
-			return 0;
-		var parts = term.split("*");
-		var val = 1.0;
-		for (p in parts)
+		if (s == null)
+			return null;
+
+		var out = new StringBuf();
+		var i = 0;
+
+		while (i < s.length)
 		{
-			var sub = p.split("/");
-			var v = Std.parseFloat(sub[0].trim());
-			if (Math.isNaN(v))
-				v = 0;
-			for (k in 1...sub.length)
+			var ch = s.charAt(i);
+
+			// Look for %TOKEN%
+			if (ch == "%" && i + 1 < s.length)
 			{
-				var d = Std.parseFloat(sub[k].trim());
-				if (d == 0)
-					d = 1;
-				v /= d;
+				var j = i + 1;
+				while (j < s.length && s.charAt(j) != "%")
+					j++;
+
+				// Found a closing % -> parse token
+				if (j < s.length && s.charAt(j) == "%")
+				{
+					var token = s.substr(i + 1, j - i - 1); // e.g. TITLE, BOX-1, YEAR+2
+					var name = token;
+					var off = 0;
+
+					// Optional +N / -N offset at the end of the token
+					var plus = token.lastIndexOf("+");
+					var minus = token.lastIndexOf("-");
+					var idx = (plus > 0) ? plus : (minus > 0 ? minus : -1);
+					if (idx > 0)
+					{
+						name = token.substr(0, idx);
+						var ofsStr = token.substr(idx); // includes sign
+						var n = Std.parseInt(ofsStr);
+						if (n != null)
+							off = n;
+					}
+
+					var val = ctx.resolveVar(name, off);
+					out.add(val != null ? val : "");
+					i = j + 1;
+					continue;
+				}
 			}
-			val *= v;
+			// Not a token; copy char
+			out.add(ch);
+			i++;
 		}
-		return val;
+		return out.toString();
 	}
 
 	public static inline function parseXY(s:String, w:Int, h:Int):{x:Int, y:Int}
@@ -276,13 +302,12 @@ class Theme
 	public static inline function parseWH(s:String, w:Int, h:Int):{w:Int, h:Int}
 	{
 		if (s == null)
-			return {w: 0, h: 0};
+			return {w: w, h: h};
 		var parts = s.split(",");
 		return {w: evalExpr(parts[0], w, h), h: evalExpr(parts[1], w, h)};
 	}
 
-	/** Contain-fit using setGraphicSize (concise + robust). */
-	public static inline function fitContainFlx(s:FlxSprite, x:Int, y:Int, boxW:Int, boxH:Int):Void
+	public static inline function fitContainFlx(s:FlxSprite, x:Int, y:Int, bw:Int, bh:Int):Void
 	{
 		var fw = s.frameWidth;
 		var fh = s.frameHeight;
@@ -291,18 +316,40 @@ class Theme
 			s.visible = false;
 			return;
 		}
-		// reset any prior transform state
 		s.origin.set(0, 0);
 		s.offset.set(0, 0);
 		s.scale.set(1, 1);
 		s.updateHitbox();
-
-		var sc = Math.min(boxW / fw, boxH / fh);
+		var sc = Math.min(bw / fw, bh / fh);
 		s.setGraphicSize(Std.int(fw * sc), Std.int(fh * sc));
 		s.updateHitbox();
-		s.setPosition(x + Std.int((boxW - s.width) * 0.5), y + Std.int((boxH - s.height) * 0.5));
+		s.setPosition(x + Std.int((bw - s.width) * 0.5), y + Std.int((bh - s.height) * 0.5));
+	}
+
+	// cache helper
+	static function addToFlixelCache(abs:String):Void
+	{
+		var g = flixel.FlxG.bitmap.get(abs);
+		if (g == null)
+		{
+			try
+			{
+				var bd = openfl.display.BitmapData.fromFile(abs);
+				g = flixel.FlxG.bitmap.add(bd, false, abs);
+				if (g != null)
+				{
+					g.persist = true;
+					g.destroyOnNoUse = false;
+				}
+			}
+			catch (_:Dynamic) {}
+		}
 	}
 }
+
+/* -------------------- existing nodes kept as-is -------------------- */
+// TextNode, GraphicNode, RectNode, CarouselNode
+// (leave your current working versions in place)
 
 /** ===== Nodes ===== */
 class TextNode implements IThemeNode
@@ -558,12 +605,12 @@ class CarouselNode implements IThemeNode
 		this._name = spec.name;
 
 		tiles = getInt("tiles", 7);
-		tileW = getInt("tileW", 160);
-		tileH = getInt("tileH", 100);
-		spacing = getInt("spacing", 20);
-		centerScale = getFloat("centerScale", 1.05);
+		tileW = getInt("tileW", 150);
+		tileH = getInt("tileH", 90);
+		spacing = getInt("spacing", 18);
+		centerScale = getFloat("centerScale", 1.08);
 		sideScale = getFloat("sideScale", 0.90);
-		farScale = getFloat("farScale", 0.80);
+		farScale = getFloat("farScale", 0.75);
 		alphaNear = getFloat("alphaNear", 1.0);
 		alphaFar = getFloat("alphaFar", 0.35);
 
@@ -640,7 +687,6 @@ class CarouselNode implements IThemeNode
 			}
 
 			s.loadGraphic(gr);
-			// Clamp to tileW×tileH (even though we baked small, this keeps JSON in control)
 			s.setGraphicSize(tileW, tileH);
 			s.updateHitbox();
 
@@ -666,13 +712,30 @@ class CarouselNode implements IThemeNode
 		}
 	}
 
+	/** Wiggle *all* tiles with tiny stagger and bounce-back. */
 	public function wiggle(direction:Int):Void
 	{
-		if (centerSprite == null)
-			return;
-		flixel.tweens.FlxTween.cancelTweensOf(centerSprite);
-		centerSprite.angle = (direction < 0) ? 6 : -6;
-		flixel.tweens.FlxTween.tween(centerSprite, {angle: 0}, 0.25, {ease: flixel.tweens.FlxEase.backOut});
+		// small tilt per tile, fading with distance
+		var mid = Std.int(tiles / 2);
+		for (i in 0...sprites.length)
+		{
+			var s = sprites[i];
+			if (s == null || !s.visible)
+				continue;
+			var offset = i - mid;
+			var dist = (offset < 0) ? -offset : offset;
+
+			flixel.tweens.FlxTween.cancelTweensOf(s);
+			var base = (direction < 0) ? 6 : -6;
+			var amt = base * Math.max(0.25, 1.0 - dist * 0.22);
+			s.angle = amt;
+
+			var delay = dist * 0.02;
+			flixel.tweens.FlxTween.tween(s, {angle: 0}, 0.28, {
+				startDelay: delay,
+				ease: flixel.tweens.FlxEase.backOut
+			});
+		}
 	}
 
 	function rebuildSprites():Void

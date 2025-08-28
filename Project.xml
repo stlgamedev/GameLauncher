@@ -7,14 +7,17 @@
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
 
-<set name="BUILD_DIR" value="exports" />
+<set name="BUILD_DIR" value="export5" />
+
 
 	<source path="source" />
 	<assets path="assets" />
 
 
 	<haxelib name="flixel" />
+
 <haxelib name="openfl-aseprite" />
+
 
 
 	<haxedef name="FLX_NO_HEALTH" />
@@ -26,10 +29,13 @@
 
 
 
+
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
 <architecture name="x64" if="windows" />
 
+
 <haxedef name="import" value="Import" />
+
 
 
 <haxedef name="dce=full" if="release" />
@@ -37,8 +43,10 @@
 <haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
 
 
+
 <haxedef name="no-console" if="windows" />
 <haxedef name="noInlineImport" />
+
 
 
 

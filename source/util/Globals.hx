@@ -7,4 +7,6 @@ class Globals
 	public static var cfg:Config;
 	public static var games:Array<GameEntry>;
 	public static var theme:Theme;
+	public static var shaderKick:Float = 0.0; // 0..~1; ShaderNode decays it each frame
+
 }
