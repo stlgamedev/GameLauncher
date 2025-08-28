@@ -1,6 +1,22 @@
 package;
 
-
+import haxe.io.Path as HxPath;
+import aseprite.Aseprite;
+import flixel.FlxG;
+import flixel.FlxSprite;
+import flixel.FlxState;
+import flixel.text.FlxText;
+import flixel.util.FlxColor;
+import flixel.util.FlxDestroyUtil;
+import openfl.Assets;
+import openfl.display.BitmapData;
+import openfl.display.Sprite;
+import openfl.geom.Matrix;
+import util.CartBake;
+import util.Config;
+import util.GameIndex;
+import util.Logger.Log;
+import util.Paths;
 
 class BootState extends FlxState
 {
@@ -10,51 +26,45 @@ class BootState extends FlxState
 	var logo:Aseprite;
 
 	var step:Int = 0;
-	var totalSteps:Int = 6;
-	var waitUntil:Float = 0; // for the preload grace window
+	var totalSteps:Int = 7;
+	var waitUntil:Float = 0;
 
 	override public function create():Void
 	{
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
 
-		label = new FlxText(0, FlxG.height * 0.6, FlxG.width, "Loading…");
+		label = new FlxText(0, Std.int(FlxG.height * 0.60), FlxG.width, "Loading…");
 		label.setFormat(null, 24, FlxColor.WHITE, "center");
 		add(label);
 
-		barBG = new FlxSprite(FlxG.width * 0.2, FlxG.height * 0.7).makeGraphic(Std.int(FlxG.width * 0.6), 12, 0xFF303036);
+		barBG = new FlxSprite(Std.int(FlxG.width * 0.20), Std.int(FlxG.height * 0.70)).makeGraphic(Std.int(FlxG.width * 0.60), 12, 0xFF303036);
 		barFG = new FlxSprite(barBG.x, barBG.y).makeGraphic(1, 12, 0xFFE0E0E0);
 		add(barBG);
 		add(barFG);
 
 		logo = Aseprite.fromBytes(Assets.getBytes("assets/images/spinning_icon.aseprite"));
-
 		logo.play();
 		logo.mouseEnabled = logo.mouseChildren = false;
 		FlxG.stage.addChild(logo);
-		var sw = FlxG.stage.stageWidth;
-		var sh = FlxG.stage.stageHeight;
+		fitOpenFL(logo, FlxG.stage.stageWidth, FlxG.stage.stageHeight);
 
-		var maxW = Std.int(sw * 0.12);
-		var maxH = Std.int(sh * 0.12);
-		fitContainOpenFL(logo, sw - maxW - 24, sh - maxH - 24, maxW, maxH);
-		// Start at step 0
 		step = 0;
 	}
 
-	inline function fitContainOpenFL(d:openfl.display.DisplayObject, x:Int, y:Int, w:Int, h:Int):Void
+	inline function fitOpenFL(d:openfl.display.DisplayObject, sw:Int, sh:Int):Void
 	{
-		// compute natural size at scale = 1
+		// bottom-right 12%
+		var maxW = Std.int(sw * 0.12);
+		var maxH = Std.int(sh * 0.12);
 		d.scaleX = d.scaleY = 1;
 		var ow = d.width, oh = d.height;
 		if (ow <= 0 || oh <= 0)
 			return;
-
-		var sc = Math.min(w / ow, h / oh);
+		var sc = Math.min(maxW / ow, maxH / oh);
 		d.scaleX = d.scaleY = sc;
-
-		d.x = x + Std.int((w - d.width) * 0.5);
-		d.y = y + Std.int((h - d.height) * 0.5);
+		d.x = sw - Std.int(d.width) - 24;
+		d.y = sh - Std.int(d.height) - 24;
 	}
 
 	override public function update(elapsed:Float):Void
@@ -68,46 +78,56 @@ class BootState extends FlxState
 				try
 					Paths.ensureLogs()
 				catch (_:Dynamic) {}
-				Globals.log = new Logger();
-				Globals.log.line("[BOOT] Logs ready.");
+				Globals.log = new util.Logger();
+				Log.line("=== Launcher started ===");
 				stepDone("Logs");
+
 			case 1:
 				// Config
 				Globals.cfg = Config.loadOrCreate();
-				Globals.log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir);
+				Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir + ", theme=" + Globals.cfg.theme);
 				stepDone("Config");
+
 			case 2:
-				// Content dirs
+				// Content dirs (after cfg)
 				try
 					Paths.ensureContent()
 				catch (_:Dynamic) {}
-				Globals.log.line("[BOOT] Content dirs ensured.");
+				Log.line("[BOOT] Content dirs ensured.");
 				stepDone("Content dirs");
+
 			case 3:
 				// Scan games
 				Globals.games = GameIndex.scanGames();
-				Globals.log.line("[BOOT] Discovered " + Globals.games.length + " game(s).");
+				Log.line("[BOOT] Discovered " + Globals.games.length + " game(s).");
 				stepDone("Scan games");
+
 			case 4:
-				Globals.theme = Theme.load(Path.join([Paths.DIR_THEMES, Globals.cfg.theme]));
+				// Load theme
+				final themeDir = HxPath.join([Paths.themesDir(), Globals.cfg.theme]);
+				Globals.theme = themes.Theme.load(themeDir);
 				Globals.theme.preloadAssets();
-				// Globals.theme = Theme.load(Globals.cfg.themeDir);
+				Log.line("[BOOT] Theme loaded from: " + themeDir);
 				stepDone("Load theme");
+
 			case 5:
-				// Preload box art (Flixel cache)
-				Preload.preloadGamesBoxArt(Globals.games);
-				// small grace period so first cover likely shows
-				waitUntil = FlxG.game.ticks / 1000 + 0.5; // ~500ms
-				stepDone("Preload covers (kickoff)");
+				// Bake Carts (small, disk-friendly)
+				final frameAbs = HxPath.join([Globals.theme.dir, "cart_frame.png"]);
+				Log.line("[BOOT] Cart frame = " + frameAbs);
+				CartBake.TARGET_WIDTH = 200; // tweakable
+				CartBake.buildAll(Globals.games, frameAbs);
+				stepDone("Bake carts");
+
 			case 6:
-				// Wait until either all covers cached or we hit the time budget
-				if (coversReady() || (FlxG.game.ticks / 1000) >= waitUntil)
-				{
-					stepDone("Preload covers (settled)");
-				}
+				// Small grace so first cover has time to cache
+				waitUntil = FlxG.game.ticks / 1000 + 0.35;
+				stepDone("Preload settle");
+
 			case 7:
-				// Go!
-				FlxG.switchState(() -> new GameSelectState());
+				if ((FlxG.game.ticks / 1000) >= waitUntil)
+				{
+					FlxG.switchState(() -> new GameSelectState());
+				}
 		}
 
 		updateProgress();
@@ -115,20 +135,8 @@ class BootState extends FlxState
 
 	inline function stepDone(name:String):Void
 	{
-		Globals.log.line("[BOOT] " + name + " done.");
+		Log.line("[BOOT] " + name + " done.");
 		step++;
-	}
-
-	function coversReady():Bool
-	{
-		for (g in Globals.games)
-		{
-			if (g.box == null || g.box == "")
-				continue;
-			if (!Preload.has(g.box))
-				return false;
-		}
-		return true;
 	}
 
 	function updateProgress():Void
@@ -136,7 +144,7 @@ class BootState extends FlxState
 		var pct:Float = Math.min(step / totalSteps, 1.0);
 		label.text = "Loading… " + Std.int(pct * 100) + "%";
 		var w:Int = Std.int((barBG.width) * pct);
-		barFG.makeGraphic(Std.int(Math.max(w, 1)), 12, 0xFFE0E0E0);
+		barFG.makeGraphic((w <= 0 ? 1 : w), 12, 0xFFE0E0E0);
 	}
 
 	override public function destroy()
@@ -144,15 +152,9 @@ class BootState extends FlxState
 		label = FlxDestroyUtil.destroy(label);
 		barBG = FlxDestroyUtil.destroy(barBG);
 		barFG = FlxDestroyUtil.destroy(barFG);
-		if (logo != null)
-		{
-			if (logo.parent != null)
-			{
-				logo.parent.removeChild(logo);
-			}
-
-			logo = null;
-		}
+		if (logo != null && logo.parent != null)
+			logo.parent.removeChild(logo);
+		logo = null;
 		super.destroy();
 	}
 }

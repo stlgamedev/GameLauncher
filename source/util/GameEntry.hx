@@ -11,6 +11,9 @@ class GameEntry
 	public var year:Int;
 	public var genres:Array<String>;
 	public var box(get, null):String;
+	public var cartKey:Null<String>;
+	public var cartPath:Null<String>;
+
 
 	public function new(id:String, title:String, developers:Array<String>, description:String, year:Int, genres:Array<String>)
 	{
@@ -24,6 +27,6 @@ class GameEntry
 
 	function get_box():String
 	{
-		return Path.join([Paths.DIR_GAMES, id, "box.png"]);
+		return Path.join([Paths.gamesDir(), id, "box.png"]);
 	}
 }

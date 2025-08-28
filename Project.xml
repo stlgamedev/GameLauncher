@@ -7,7 +7,8 @@
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
 
-	<set name="BUILD_DIR" value="export" />
+<set name="BUILD_DIR" value="exports" />
+
 	<source path="source" />
 	<assets path="assets" />
 

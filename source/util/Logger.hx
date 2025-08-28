@@ -12,9 +12,9 @@ class Logger {
 
     public function new() {
         dayStamp = todayStamp();
-		if (!FileSystem.exists(Paths.DIR_LOGS))
-			FileSystem.createDirectory(Paths.DIR_LOGS);
-		final logPath = Path.join([Paths.DIR_LOGS, 'gl-' + dayStamp + '.log']);
+		if (!FileSystem.exists(Paths.logsRoot()))
+			FileSystem.createDirectory(Paths.logsRoot());
+		final logPath = Path.join([Paths.logsRoot(), 'gl-' + dayStamp + '.log']);
 		out = File.append(logPath, true);
         line("=== Launcher started (build " + getBuildStamp() + ") ===");
     }

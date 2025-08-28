@@ -9,11 +9,11 @@ class GameIndex
 	public static function scanGames():Array<GameEntry>
 	{
 		var games:Array<GameEntry> = [];
-		for (name in safeReadDir(Paths.DIR_GAMES))
+		for (name in safeReadDir(Paths.gamesDir()))
 		{
 			if (name.length == 0 || name.charAt(0) == '.')
 				continue;
-			final gPath:String = Path.join([Paths.DIR_GAMES, name]);
+			final gPath:String = Path.join([Paths.gamesDir(), name]);
 			if (!FileSystem.isDirectory(gPath))
 				continue;
 			final jsonPath:String = Path.join([gPath, "game.json"]);

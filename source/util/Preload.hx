@@ -1,86 +1,73 @@
 package util;
 
+import flixel.FlxG;
+import flixel.graphics.FlxGraphic;
+import haxe.io.Path;
+import openfl.display.BitmapData;
+import sys.FileSystem;
 
-/**
- * Preloads external images into Flixel's bitmap cache (FlxG.bitmap).
- * Key = absolute file path.
- */
 class Preload
 {
-	// Optional: one-shot listeners for when a specific key finishes loading
-	static var onReady:Map<String, Array<Void->Void>> = [];
-
-	public static function preloadGamesBoxArt(games:Array<GameEntry>):Void
+	public static function preloadGamesBoxArt(games:Array<util.GameEntry>):Void
 	{
 		if (games == null)
 			return;
 		for (g in games)
 		{
-			if (g.box == null || g.box == "")
+			if (g == null || g.box == null || g.box == "")
 				continue;
-			preloadOne(g.box);
-		}
-	}
 
-	public static function has(key:String):Bool
-	{
-		return key != null && FlxG.bitmap.get(key) != null;
-	}
-
-	public static function get(key:String):FlxGraphic
-	{
-		return key == null ? null : FlxG.bitmap.get(key);
-	}
-
-	public static function whenReady(key:String, cb:Void->Void):Void
-	{
-		if (key == null)
-			return;
-		if (has(key))
-		{
-			cb();
-			return;
-		}
-		if (onReady[key] == null)
-			onReady[key] = [];
-		onReady[key].push(cb);
-		preloadOne(key); // ensure a load is in flight
-	}
-
-	public static function preloadOne(key:String):Void
-	{
-		if (key == null || key == "")
-			return;
-		if (FlxG.bitmap.get(key) != null)
-		{
-			notify(key);
-			return;
-		}
-		// Load from disk (async) via OpenFL
-		BitmapData.loadFromFile(key).onComplete((bmd) ->
-		{
-			var gr = FlxG.bitmap.add(bmd, true, key); // cache under 'key'
-			// Stick around even if not referenced momentarily
-			gr.persist = true;
-			gr.destroyOnNoUse = false;
-			notify(key);
-		}).onError((err) ->
+			var abs = g.box;
+			if (!isAbsolute(abs))
 			{
-				// Failed load -> do nothing; callers can decide how to handle
-				notify(key);
-			});
+				var root = (Globals.cfg != null && Globals.cfg.contentRootDir != null && Globals.cfg.contentRootDir != "") ? Globals.cfg.contentRootDir : "external";
+				abs = Path.join([root, abs]);
+			}
+			if (!FileSystem.exists(abs))
+			{
+				util.Logger.Log.line("[PRELOAD][MISS] " + abs);
+				continue;
+			}
+
+			var gr:FlxGraphic = FlxG.bitmap.get(abs);
+			if (gr == null)
+			{
+				try
+				{
+					var bd = BitmapData.fromFile(abs);
+					if (bd != null)
+					{
+						gr = FlxG.bitmap.add(bd, false, abs);
+						if (gr != null)
+						{
+							gr.destroyOnNoUse = false;
+							gr.persist = true;
+						}
+					}
+				}
+				catch (e:Dynamic)
+				{
+					util.Logger.Log.line("[PRELOAD][ERROR] " + abs + " :: " + Std.string(e));
+				}
+			}
+		}
 	}
 
-	static function notify(key:String):Void
+	public static function has(absPath:String):Bool
 	{
-		var arr = onReady[key];
-		if (arr != null)
-		{
-			for (cb in arr)
-				try
-					cb()
-				catch (_:Dynamic) {}
-			onReady.remove(key);
-		}
+		// We key by absolute path in FlxG.bitmap
+		return FlxG.bitmap.get(absPath) != null;
+	}
+
+	static inline function isAbsolute(p:String):Bool
+	{
+		if (p == null || p == "")
+			return false;
+		var c0 = p.charAt(0);
+		if (c0 == "/" || c0 == "\\")
+			return true;
+		if (p.length >= 2 && p.charAt(1) == ":")
+			return true; // C:\
+		return false;
 	}
 }

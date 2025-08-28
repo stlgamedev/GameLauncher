@@ -1,6 +1,7 @@
 # Haxe / HaxeFlixel / hxcpp / OpenFL
 Export/
 export/
+exports/
 bin/
 obj/
 .haxelib/
@@ -20,3 +21,4 @@ obj/
 
 external/
 logs/
+dump/

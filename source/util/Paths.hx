@@ -1,34 +1,60 @@
 package util;
 
+import haxe.io.Path;
+import sys.FileSystem;
 
 class Paths {
-	public static var DIR_LOGS = "logs";
-	public static var DIR_GAMES = "";
-	public static var DIR_TRAILERS = "";
-	public static var DIR_THEMES = "";
+	/** Root for content (games/trailers/themes). Falls back to "external". */
+	public static function contentRoot():String
+	{
+		var root = (Globals.cfg != null && Globals.cfg.contentRootDir != null && Globals.cfg.contentRootDir != "") ? Globals.cfg.contentRootDir : "external";
+		return normalize(root);
+	}
 
-	// 1) Only logs (safe pre-config)
+	/** Root for logs. Falls back to "logs". */
+	public static function logsRoot():String
+	{
+		var p = (Globals.cfg != null && Globals.cfg.logsRoot != null && Globals.cfg.logsRoot != "") ? Globals.cfg.logsRoot : "logs";
+		return normalize(p);
+	}
+
+	/** Derived content folders (computed at call-time). */
+	public static inline function gamesDir():String
+		return Path.join([contentRoot(), "games"]);
+
+	public static inline function trailersDir():String
+		return Path.join([contentRoot(), "trailers"]);
+
+	public static inline function themesDir():String
+		return Path.join([contentRoot(), "themes"]);
+
+	/** Create logs dir (safe once cfg exists). */
 	public static function ensureLogs():Void
 	{
-		ensureDir(DIR_LOGS);
+		ensureDir(logsRoot());
 	}
 
-	// 2) Content dirs (needs cfg)
+	/** Create content tree (root + subdirs). */
 	public static function ensureContent():Void
 	{
-		final root = normalize(Path.join([Globals.cfg.contentRootDir]));
-		DIR_GAMES = Path.join([root, "games"]);
-		DIR_TRAILERS = Path.join([root, "trailers"]);
-		DIR_THEMES = Path.join([root, "themes"]);
-		ensureDir(root);
-		ensureDir(DIR_GAMES);
-		ensureDir(DIR_TRAILERS);
-		ensureDir(DIR_THEMES);
+		ensureDir(contentRoot());
+		ensureDir(gamesDir());
+		ensureDir(trailersDir());
+		ensureDir(themesDir());
 	}
 
-	static inline function normalize(p:String):String
-		return Path.normalize(p);
-    static function ensureDir(p:String):Void {
-        if (!FileSystem.exists(p)) FileSystem.createDirectory(p);
-    }
+	// ---- helpers ----
+
+	public static inline function normalize(p:String):String
+	{
+		return (p == null || p == "") ? "" : Path.normalize(p);
+	}
+
+	static function ensureDir(p:String):Void
+	{
+		if (p == null || p == "")
+			return;
+		if (!FileSystem.exists(p))
+			FileSystem.createDirectory(p);
+	}
 }
