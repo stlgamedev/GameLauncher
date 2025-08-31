@@ -1,48 +1,35 @@
 package;
 
+import aseprite.Aseprite;
 import flixel.FlxG;
-import flixel.FlxSprite;
 import flixel.FlxState;
-import flixel.group.FlxGroup;
-import flixel.math.FlxPoint;
-import flixel.sound.FlxSound;
-import flixel.text.FlxText;
-import flixel.tweens.FlxEase;
 import flixel.tweens.FlxTween;
-import flixel.util.FlxColor;
 import haxe.io.Eof;
+import openfl.Assets;
 import openfl.display.BitmapData;
+import sys.FileSystem;
 import sys.io.Process;
 import sys.thread.Thread;
-#if sys
-import sys.FileSystem;
-import sys.io.File;
-#end
 
 class LaunchState extends FlxState
 {
-	// Input
-	static inline var HOTKEY_KEY = 0x7B; // F12 (FlxG.keys justPressed.F12 also used)
+	public var game:util.GameEntry;
 
-	// Visuals
-	var splash:FlxSprite; // scaled g.box
-	var spinner:FlxSprite; // simple rotating indicator
-	var msg:FlxText; // small status text (errors/fallback)
+	var splash:flixel.FlxSprite; // centered box art (fit)
+	var logo:Aseprite; // spinner shown in BR corner (same as BootState)
 
-	// Process
 	var proc:Process = null;
 	var procExited:Bool = false;
 	var procExitCode:Null<Int> = null;
 
-	// Idle watchdog
-	var idleLimit:Float = 300.0; // default, overwritten from Globals.cfg.idleSecondsGame
-	var idleTimer:Float = 0.0;
+	// idle / hotkey
+	var idleTimeout:Float = 300.0; // seconds; will be set from Globals.cfg.idleSecondsGame
+	var hotkeyPressed:Bool = false; // SHIFT+F12 debounce
 
-	// Minor feedback SFX (optional from carousel theme if present)
-	var sfxStart:FlxSound = null;
-
-	// Game
-	var game:util.GameEntry;
+	// Optional XInput dynamic
+	#if cpp
+	var XInputGetState:Dynamic = null;
+	#end
 
 	public function new(g:util.GameEntry)
 	{
@@ -53,247 +40,193 @@ class LaunchState extends FlxState
 	override public function create():Void
 	{
 		super.create();
-
 		FlxG.cameras.bgColor = 0xFF000000;
 
-		// Idle limit from config (safe)
-		if (Globals.cfg != null && Globals.cfg.idleSecondsGame > 0)
-			idleLimit = Globals.cfg.idleSecondsGame;
-
-		// Background splash from g.box (center/fit)
-		splash = new FlxSprite();
+		// --- Box art centered (fit ~80% of screen) ---
+		splash = new flixel.FlxSprite();
+		var boxPath = game.box;
+		if (boxPath != null && FileSystem.exists(boxPath))
+		{
+			try
+			{
+				var bd = BitmapData.fromFile(boxPath);
+				splash.loadGraphic(bd);
+			}
+			catch (_:Dynamic) {}
+		}
 		splash.antialiasing = true;
 		add(splash);
+		resizeSplash();
 
-		#if sys
-		var boxAbs = game.box;
-		if (boxAbs != null && boxAbs != "" && sys.FileSystem.exists(boxAbs))
+		// --- Spinner (same asset/placement as BootState) ---
+		try
 		{
-			try
-			{
-				var bd = BitmapData.fromFile(boxAbs);
-				if (bd != null)
-				{
-					splash.loadGraphic(bd);
-					fitContain(splash, 0, 0, FlxG.width, FlxG.height);
-				}
-			}
-			catch (_:Dynamic) {}
+			var bytes = Assets.getBytes("assets/images/spinning_icon.aseprite");
+			logo = Aseprite.fromBytes(bytes);
+			logo.play();
+			logo.mouseEnabled = logo.mouseChildren = false;
+			FlxG.stage.addChild(logo);
+			fitOpenFL(logo, FlxG.stage.stageWidth, FlxG.stage.stageHeight);
 		}
-		#end
-
-		// If splash never loaded, make a dim placeholder
-		if (splash.pixels == null)
+		catch (_:Dynamic)
 		{
-			splash.makeGraphic(FlxG.width, FlxG.height, FlxColor.fromRGB(16, 16, 16));
+			logo = null;
 		}
 
-		// Spinner (small square that rotates; no external dependency)
-		spinner = new FlxSprite();
-		spinner.makeGraphic(24, 24, FlxColor.WHITE);
-		spinner.antialiasing = true;
-		spinner.alpha = 0.85;
-		spinner.x = FlxG.width - spinner.width - 24;
-		spinner.y = FlxG.height - spinner.height - 24;
-		add(spinner);
+		// Idle timeout from config
+		if (Globals.cfg != null && Globals.cfg.idleSecondsGame > 0)
+			idleTimeout = Globals.cfg.idleSecondsGame;
 
-		// Status text (optional)
-		msg = new FlxText(0, 0, FlxG.width, "Launching \"" + game.title + "\"…");
-		msg.setFormat(null, 16, FlxColor.GRAY, "center");
-		msg.y = FlxG.height - 48;
-		add(msg);
-
-		// Optional: get launch sound already loaded by CarouselNode (if exists)
-		// We won't re-load from disk; we just ask the theme node for its FlxSound.
-		var car:themes.CarouselNode = cast Globals.theme.getNodeByName("carousel");
-		if (car != null && Reflect.hasField(car, "sfxStart"))
-		{
-			try
-			{
-				sfxStart = cast Reflect.field(car, "sfxStart");
-			}
-			catch (_:Dynamic) {}
-		}
-		if (sfxStart != null)
-		{
-			// brief cue; we don't block onComplete here (we go launch in parallel)
-			sfxStart.stop();
-			sfxStart.play();
-		}
-
-		// Start rotating spinner forever (tween resets self)
-		spinLoop();
-
-		// Launch game on a background thread, watch process
+		// Start process + monitors
 		launchGameAsync();
+		#if cpp
+		initXInputOptional();
+		startIdleAndHotkeyMonitors();
+		#end
+	}
+
+	override public function destroy():Void
+	{
+		if (logo != null && logo.parent != null)
+			logo.parent.removeChild(logo);
+		logo = null;
+
+		if (proc != null)
+		{
+			try
+				proc.close()
+			catch (_:Dynamic) {}
+			proc = null;
+		}
+		super.destroy();
 	}
 
 	override public function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
 
-		// Keep spinner visible
-		// (rotation handled via tween)
-
-		// Focused hotkey to abort: SHIFT + F12
-		if (FlxG.keys.pressed.SHIFT && FlxG.keys.justPressed.F12)
-		{
-			Globals.log.line('[LAUNCH] SHIFT+F12 pressed: killing game and returning.');
-			killGameAndReturn();
-			return;
-		}
-
-		// Idle watchdog: reset if any recent input
-		if (anyActivity())
-		{
-			idleTimer = 0;
-		}
-		else
-		{
-			idleTimer += elapsed;
-			if (idleTimer >= idleLimit)
-			{
-				Globals.log.line('[LAUNCH] Idle limit reached (' + idleLimit + 's). Killing game.');
-				killGameAndReturn();
-				return;
-			}
-		}
-
-		// If process finished, go back
+		// Return when game exits
+		#if sys
 		if (procExited)
 		{
-			// Small delay so last frame draws
+			FlxG.switchState(() -> new GameSelectState());
+			return;
+		}
+		#end
+
+		// Safety: allow ESC to return if not kiosk
+		if (Globals.cfg.mode != "kiosk" && FlxG.keys.justPressed.ESCAPE)
+		{
 			FlxG.switchState(() -> new GameSelectState());
 			return;
 		}
 	}
 
-	override public function destroy():Void
+	/* ---------------------- layout helpers ---------------------- */
+	function resizeSplash():Void
 	{
-		// Ensure we don't leak the child process if the state is torn down
-		try
-		{
-			if (proc != null && proc.exitCode(false) == null)
-			{
-				proc.kill();
-			}
-		}
-		catch (_:Dynamic) {}
-		proc = null;
-
-		super.destroy();
-	}
-
-	/* ================= helpers ================= */
-	function spinLoop():Void
-	{
-		spinner.angle = 0;
-		FlxTween.tween(spinner, {angle: 360}, 1.0, {
-			ease: FlxEase.linear,
-			onComplete: _ -> spinLoop()
-		});
-	}
-
-	// Contain-fit a FlxSprite inside box while centering (origin 0,0)
-	static inline function fitContain(s:FlxSprite, x:Int, y:Int, bw:Int, bh:Int):Void
-	{
-		var fw = s.frameWidth;
-		var fh = s.frameHeight;
-		if (fw <= 0 || fh <= 0)
+		if (splash == null || splash.frameWidth == 0 || splash.frameHeight == 0)
 			return;
-		s.origin.set(0, 0);
-		s.offset.set(0, 0);
-		s.scale.set(1, 1);
-		s.updateHitbox();
-		var sc = Math.min(bw / fw, bh / fh);
-		s.setGraphicSize(Std.int(fw * sc), Std.int(fh * sc));
-		s.updateHitbox();
-		s.setPosition(x + Std.int((bw - s.width) * 0.5), y + Std.int((bh - s.height) * 0.5));
+
+		var maxW = Std.int(FlxG.width * 0.80);
+		var maxH = Std.int(FlxG.height * 0.80);
+		var fw = splash.frameWidth;
+		var fh = splash.frameHeight;
+		var sc = Math.min(maxW / fw, maxH / fh);
+
+		splash.setGraphicSize(Std.int(fw * sc), Std.int(fh * sc));
+		splash.updateHitbox();
+		splash.x = Std.int((FlxG.width - splash.width) * 0.5);
+		splash.y = Std.int((FlxG.height - splash.height) * 0.5);
 	}
 
-	function anyActivity():Bool
+	inline function fitOpenFL(d:openfl.display.DisplayObject, sw:Int, sh:Int):Void
 	{
-		// Keys
-		if (FlxG.keys.anyJustPressed([ANY]) || FlxG.keys.anyJustReleased([ANY]))
-			return true;
-		// Mouse
-		if (FlxG.mouse.justMoved || FlxG.mouse.justPressed || FlxG.mouse.justReleased)
-			return true;
-		// Gamepads (if present)
-		#if flixel
-		if (FlxG.gamepads != null && FlxG.gamepads.anyButton())
-			return true;
-		#end
-		return false;
+		// bottom-right 12% (same recipe as BootState)
+		var maxW = Std.int(sw * 0.12);
+		var maxH = Std.int(sh * 0.12);
+		d.scaleX = d.scaleY = 1;
+		var ow = d.width, oh = d.height;
+		if (ow <= 0 || oh <= 0)
+			return;
+		var sc = Math.min(maxW / ow, maxH / oh);
+		d.scaleX = d.scaleY = sc;
+		d.x = sw - Std.int(d.width) - 24;
+		d.y = sh - Std.int(d.height) - 24;
 	}
 
+	/* ---------------------- process spawn/monitor ---------------------- */
 	function launchGameAsync():Void
 	{
 		#if sys
-		var exe:String = game.exe; // your helper that returns "<gamesDir>/<id>/<exeName>.exe"
-		if (exe == "")
+		var exe:String = game.exe; // you requested this explicit usage
+		if (exe == null || exe == "" || !FileSystem.exists(exe))
 		{
-			msg.text = "No executable path.";
-			Globals.log.line("[LAUNCH][ERROR] Empty executable path for " + game.id);
+			Globals.log.line("[LAUNCH][ERROR] Executable missing: " + exe);
 			returnToMenuSoon();
 			return;
 		}
 
-		sys.thread.Thread.create(() ->
+		Thread.create(() ->
 		{
 			try
 			{
 				Globals.log.line("[LAUNCH] Starting: " + exe);
-				proc = new sys.io.Process(exe);
+				// Use arg array so paths with spaces work without quoting hacks
+				proc = new Process(exe, []);
+
+				#if cpp
+				// Bind to a Job so child dies if launcher dies
+				try
+					bindProcessToJob(proc.getPid())
+				catch (_:Dynamic) {}
+				#end
 
 				// stdout reader
-				sys.thread.Thread.create(() ->
+				Thread.create(() ->
 				{
 					try
 					{
+						var ln:String;
 						while (proc != null)
 						{
 							try
 							{
-								var ln = proc.stdout.readLine();
+								ln = proc.stdout.readLine();
 								Globals.log.line("[GAME OUT] " + ln);
 							}
-							catch (e:haxe.io.Eof)
-							{
+							catch (e:Eof)
 								break;
-							}
 						}
 					}
 					catch (_:Dynamic) {}
 				});
 
 				// stderr reader
-				sys.thread.Thread.create(() ->
+				Thread.create(() ->
 				{
 					try
 					{
+						var ln:String;
 						while (proc != null)
 						{
 							try
 							{
-								var ln = proc.stderr.readLine();
+								ln = proc.stderr.readLine();
 								Globals.log.line("[GAME ERR] " + ln);
 							}
-							catch (e:haxe.io.Eof)
-							{
+							catch (e:Eof)
 								break;
-							}
 						}
 					}
 					catch (_:Dynamic) {}
 				});
 
-				// wait until the game exits
+				// Wait until the game exits
 				var code:Null<Int> = null;
 				while (proc != null && (code = proc.exitCode(false)) == null)
-				{
 					Sys.sleep(0.05);
-				}
+
 				procExitCode = code;
 				Globals.log.line("[LAUNCH] Game exited with code " + Std.string(code));
 			}
@@ -301,33 +234,184 @@ class LaunchState extends FlxState
 			{
 				Globals.log.line("[LAUNCH][ERROR] Failed to start or watch game: " + Std.string(e));
 			}
-
-			// set exited flag no matter what (acts like 'finally')
-			procExited = true;
+			procExited = true; // emulate finally
 		});
 		#else
-		msg.text = "Launching not supported on this target.";
 		Globals.log.line("[LAUNCH][WARN] sys target required to spawn process.");
 		returnToMenuSoon();
 		#end
 	}
 
-	function killGameAndReturn():Void
-	{
-		#if sys
-		try
-		{
-			if (proc != null && proc.exitCode(false) == null)
-				proc.kill();
-		}
-		catch (_:Dynamic) {}
-		#end
-		returnToMenuSoon();
-	}
-
 	function returnToMenuSoon():Void
 	{
-		// brief delay lets UI update and spinner tick once
-		FlxTween.num(0, 1, 0.10, {onComplete: _ -> FlxG.switchState(() -> new GameSelectState())});
+		FlxTween.num(0, 1, 0.25, {onComplete: _ -> FlxG.switchState(() -> new GameSelectState())});
 	}
+
+	/* ---------------------- Idle + Hotkey (Windows / C++) ---------------------- */
+	#if cpp
+	inline function startIdleAndHotkeyMonitors():Void
+	{
+		Thread.create(() ->
+		{
+			var running = true;
+			var lastInputTick:Int = 0;
+
+			while (running)
+			{
+				Sys.sleep(0.10);
+
+				// stop if process died
+				if (proc == null || procExited)
+					break;
+
+				// Global hotkey: SHIFT+F12 (no focus required)
+				var down:Int = 0;
+				untyped __cpp__('
+					{ down = ((GetAsyncKeyState(VK_SHIFT)&0x8000) && (GetAsyncKeyState(VK_F12)&0x8000)) ? 1 : 0; }
+				');
+				if (down != 0)
+				{
+					if (!hotkeyPressed)
+					{
+						hotkeyPressed = true;
+						Globals.log.line("[HOTKEY] SHIFT+F12 pressed -> kill game");
+						forceKillGame();
+					}
+				}
+				else
+				{
+					hotkeyPressed = false;
+				}
+
+				// Idle: keyboard/mouse inactivity using GetLastInputInfo
+				var nowTick:Int = 0;
+				var lastTick:Int = 0;
+				untyped __cpp__('
+					{
+						LASTINPUTINFO lii; lii.cbSize = sizeof(LASTINPUTINFO);
+						if (GetLastInputInfo(&lii)) { lastTick = (int)lii.dwTime; }
+						nowTick = (int)GetTickCount();
+					}
+				');
+				var idleMs = nowTick - lastTick;
+				var idleSec = idleMs / 1000.0;
+
+				// Optional gamepad activity keeps it alive
+				if (idleSec >= 0.5 && checkXInputChanged())
+				{
+					// treat as activity -> set idleSec small
+					idleSec = 0.0;
+				}
+
+				if (idleSec >= idleTimeout)
+				{
+					Globals.log.line("[IDLE EXIT] No activity for " + idleTimeout + "s -> kill game");
+					forceKillGame();
+					break;
+				}
+			}
+		});
+	}
+
+	inline function forceKillGame():Void
+	{
+		try
+		{
+			if (proc != null)
+			{
+				var pid = proc.getPid();
+				// TerminateProcess by PID (in case Process.kill() fails)
+				untyped __cpp__('
+					{
+						HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, (DWORD){0});
+						if (h) { TerminateProcess(h, 1); CloseHandle(h); }
+					}
+				', pid);
+				try
+					proc.kill()
+				catch (_:Dynamic) {}
+			}
+		}
+		catch (_:Dynamic) {}
+	}
+
+	// Bind child to a Job so it dies if the launcher dies
+	inline function bindProcessToJob(pid:Int):Void
+	{
+		untyped __cpp__('
+			{
+				static HANDLE gJob = NULL;
+				if (!gJob)
+				{
+					gJob = CreateJobObject(NULL, NULL);
+					if (gJob)
+					{
+						JOBOBJECT_EXTENDED_LIMIT_INFORMATION jeli;
+						ZeroMemory(&jeli, sizeof(jeli));
+						jeli.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+						SetInformationJobObject(gJob, JobObjectExtendedLimitInformation, &jeli, sizeof(jeli));
+					}
+				}
+				if (gJob)
+				{
+					HANDLE hProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, (DWORD){0});
+					if (hProc) { AssignProcessToJobObject(gJob, hProc); CloseHandle(hProc); }
+				}
+			}
+		', pid);
+	}
+
+	// -------- Optional XInput polling --------
+	var lastPadHash:Int = 0;
+
+	inline function initXInputOptional():Void
+	{
+		// Try multiple DLL names; ignore failures
+		try
+			XInputGetState = cpp.Lib.load("xinput1_4", "XInputGetState", 2)
+		catch (_:Dynamic) {}
+		if (XInputGetState == null)
+			try
+				XInputGetState = cpp.Lib.load("xinput1_3", "XInputGetState", 2)
+			catch (_:Dynamic) {}
+	}
+
+	inline function checkXInputChanged():Bool
+	{
+		if (XInputGetState == null)
+			return false;
+
+		var hash:Int = 0;
+		for (i in 0...4)
+		{
+			var ok:Int = 0;
+			var buttons:Int = 0;
+			var lx:Int = 0, ly:Int = 0, rx:Int = 0, ry:Int = 0, lt:Int = 0, rt:Int = 0;
+
+			untyped __cpp__('
+				{
+					XINPUT_STATE st; ZeroMemory(&st, sizeof(st));
+					ok = (XInputGetState({0}, &st) == ERROR_SUCCESS) ? 1 : 0;
+					if (ok)
+					{
+						buttons = (int)st.Gamepad.wButtons;
+						lx = (int)st.Gamepad.sThumbLX; ly = (int)st.Gamepad.sThumbLY;
+						rx = (int)st.Gamepad.sThumbRX; ry = (int)st.Gamepad.sThumbRY;
+						lt = (int)st.Gamepad.bLeftTrigger; rt = (int)st.Gamepad.bRightTrigger;
+					}
+				}
+			', i);
+
+			if (ok != 0)
+				hash ^= (buttons ^ lx ^ ly ^ rx ^ ry ^ lt ^ rt);
+		}
+
+		if (hash != 0 && hash != lastPadHash)
+		{
+			lastPadHash = hash;
+			return true;
+		}
+		return false;
+	}
+	#end
 }
