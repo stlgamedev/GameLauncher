@@ -1,6 +1,5 @@
 package;
 
-import haxe.io.Path as HxPath;
 import aseprite.Aseprite;
 import flixel.FlxG;
 import flixel.FlxSprite;
@@ -8,6 +7,7 @@ import flixel.FlxState;
 import flixel.text.FlxText;
 import flixel.util.FlxColor;
 import flixel.util.FlxDestroyUtil;
+import haxe.io.Path as HxPath;
 import openfl.Assets;
 import openfl.display.BitmapData;
 import openfl.display.Sprite;
@@ -107,6 +107,9 @@ class BootState extends FlxState
 				final themeDir = HxPath.join([Paths.themesDir(), Globals.cfg.theme]);
 				Globals.theme = themes.Theme.load(themeDir);
 				Globals.theme.preloadAssets();
+				Globals.theme.preloadFonts();
+				trace('Font cache size: ' + Globals.theme._fontCache); // or expose a method to read it
+
 				Log.line("[BOOT] Theme loaded from: " + themeDir);
 				stepDone("Load theme");
 

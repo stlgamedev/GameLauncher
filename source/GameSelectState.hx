@@ -5,7 +5,6 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.util.FlxTimer;
-import util.Logger.Log;
 
 using StringTools;
 
@@ -16,6 +15,7 @@ class GameSelectState extends FlxState
 
 	var nodeMap:Map<String, FlxBasic> = new Map();
 	var staticTimer:FlxTimer;
+	var launching:Bool = false;
 
 	override public function create():Void
 	{
@@ -25,9 +25,15 @@ class GameSelectState extends FlxState
 		theme = (Globals.theme != null) ? Globals.theme : themes.Theme.load("external/themes/arcade-jam-2017");
 		theme.buildInto(this);
 
+		// name -> FlxBasic for quick lookup (cover/static)
 		nodeMap = new Map();
 		for (n in theme.nodes)
 			nodeMap.set(n.name, n.basic());
+
+		// prime carousel & theme to current selection
+		var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
+		if (car != null)
+			car.applySelected(selected);
 
 		applySelection(true);
 
@@ -40,43 +46,109 @@ class GameSelectState extends FlxState
 	{
 		super.update(elapsed);
 
-		// KEEP THEME ANIMATIONS ALIVE (vortex etc.)
+		// Always tick theme animations (vortex, etc.)
 		theme.updateAll(makeContext());
 
-		var left = FlxG.keys.justPressed.LEFT || FlxG.keys.justPressed.A;
-		var right = FlxG.keys.justPressed.RIGHT || FlxG.keys.justPressed.D;
-
-		if (left)
-			moveSelection(-1);
-		if (right)
-			moveSelection(1);
-
+		// Hard admin exits
 		if (Globals.cfg.mode != "kiosk" && FlxG.keys.justPressed.ESCAPE)
-			Sys.exit(0);
-		if (FlxG.keys.justPressed.F12 && FlxG.keys.pressed.SHIFT && FlxG.keys.pressed.ALT)
-			Sys.exit(0);
-
-		if (FlxG.keys.justPressed.ENTER && Globals.games.length > 0)
 		{
+			Sys.exit(0);
+		}
+		if (FlxG.keys.justPressed.F12 && FlxG.keys.pressed.SHIFT && FlxG.keys.pressed.ALT)
+		{
+			Sys.exit(0);
+		}
+
+		// If we're launching, ignore all inputs (still let background animate)
+		if (launching)
+		{
+			return;
+		}
+
+		// Carousel navigation (guarded by animation lock)
+		var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
+		var canNavigate = (car == null) || !car.isAnimating();
+
+		if (canNavigate)
+		{
+			var delta = 0;
+			if (FlxG.keys.justPressed.LEFT || FlxG.keys.justPressed.A)
+				delta = -1;
+			if (FlxG.keys.justPressed.RIGHT || FlxG.keys.justPressed.D)
+				delta = 1;
+
+			if (delta != 0 && Globals.games.length > 0)
+			{
+				// Compute new selection first (single source of truth)
+				var n = Globals.games.length;
+				var newSel = (selected + delta + n) % n;
+
+				// Animate the carousel row if present
+				if (car != null)
+				{
+					car.move(delta, newSel);
+				}
+
+				// Commit selection immediately so text/cover update under the static flash
+				selected = newSel;
+
+				// Update other theme nodes (cover, text, etc.)
+				applySelection(false);
+			}
+		}
+
+		// Launch game on ENTER (theme-provided launch sound, then switch)
+		if (Globals.games.length > 0 && FlxG.keys.justPressed.ENTER)
+		{
+			launching = true; // lock all inputs
+
 			var g = Globals.games[selected];
-			Log.line('[UI] Selected "' + g.title + '" (id=' + g.id + ')');
+			var go = function()
+			{
+				FlxG.switchState(() -> new LaunchState(g));
+			};
+
+			var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
+			if (car != null && car.playLaunchSound(go))
+			{
+				// switch happens in onComplete
+			}
+			else
+			{
+				go();
+			}
 		}
 	}
 
 	inline function moveSelection(delta:Int):Void
 	{
-		var n = Globals.games.length;
+		final n = Globals.games.length;
 		if (n == 0)
 			return;
 
-		// Wrap around selection index
-		selected = (selected + delta + n) % n;
+		final newSel = (selected + delta + n) % n;
 
-		// Nudge the vortex background for a satisfying kick
-		var v:themes.VortexNode = cast theme.getNodeByName("vortex");
-		if (v != null)
-			v.nudge(); // uses JSON nudgeAmount (e.g., 0.20)
+		// kick vortex (optional)
+		var vort:themes.VortexNode = cast theme.getNodeByName("vortex");
+		if (vort != null)
+		{
+			// your VortexNode should expose a nudge(); if not, remove this
+			try
+			{
+				untyped vort.nudge();
+			}
+			catch (_:Dynamic) {}
+		}
 
+		// animate carousel THEN snap to newSel inside carousel
+		var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
+		if (car != null)
+			car.move(delta, newSel);
+
+		// commit selection immediately (context will read this)
+		selected = newSel;
+
+		// update text/cover under the CRT with static flash
 		applySelection(false);
 	}
 
@@ -88,16 +160,16 @@ class GameSelectState extends FlxState
 		return {
 			w: sw,
 			h: sh,
-			themeDir: theme.dir,
+			themeDir: Globals.theme != null ? Globals.theme.dir : "external/themes/arcade-jam-2017",
 			resolveVar: (name:String, offset:Int) ->
 			{
-				var n = Globals.games.length;
+				final n = Globals.games.length;
 				if (n == 0)
 					return "";
 				var idx = (selected + offset) % n;
 				if (idx < 0)
 					idx += n;
-				var g = Globals.games[idx];
+				final g = Globals.games[idx];
 				return switch (name)
 				{
 					case "TITLE": g.title;
@@ -131,12 +203,14 @@ class GameSelectState extends FlxState
 			return;
 		}
 
+		// cancel any earlier flash
 		if (staticTimer != null)
 		{
 			staticTimer.cancel();
 			staticTimer = null;
 		}
 
+		// hide cover, show static briefly
 		if (cover != null)
 			cover.visible = false;
 		if (stat != null)
@@ -146,8 +220,10 @@ class GameSelectState extends FlxState
 			stat.visible = true;
 		}
 
-		// theme.updateAll(makeContext());
+		// update content under static
+		theme.updateAll(makeContext());
 
+		// reveal cover
 		staticTimer = new FlxTimer().start(0.30, (_) ->
 		{
 			var s1 = getSprite("static");

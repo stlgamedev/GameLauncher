@@ -1,7 +1,5 @@
 package util;
 
-
-
 class GameEntry
 {
 	public var id:String;
@@ -13,9 +11,9 @@ class GameEntry
 	public var box(get, null):String;
 	public var cartKey:Null<String>;
 	public var cartPath:Null<String>;
+	public var exe(get, null):String;
 
-
-	public function new(id:String, title:String, developers:Array<String>, description:String, year:Int, genres:Array<String>)
+	public function new(id:String, title:String, developers:Array<String>, description:String, year:Int, genres:Array<String>, ?exeName:Null<String>)
 	{
 		this.id = id;
 		this.title = title;
@@ -23,10 +21,16 @@ class GameEntry
 		this.description = description;
 		this.year = year;
 		this.genres = genres;
+		this.exe = exeName;
 	}
 
 	function get_box():String
 	{
 		return Path.join([Paths.gamesDir(), id, "box.png"]);
+	}
+
+	function get_exe():String
+	{
+		return Path.join([Paths.gamesDir(), id, exe]);
 	}
 }

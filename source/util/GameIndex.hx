@@ -31,6 +31,7 @@ class GameIndex
 				final data:Dynamic = Json.parse(rawJson);
 
 				final title:Null<String> = strOrNull(data.title);
+
 				if (title == null || title == "")
 				{
 					Log.line('GameIndex: "$name" missing "title"');
@@ -75,7 +76,9 @@ class GameIndex
 					return g.trim();
 				});
 
-				games.push(new GameEntry(name, title, devs, desc, year, genres));
+				final exeName:Null<String> = strOrNull(data.exe);
+
+				games.push(new GameEntry(name, title, devs, desc, year, genres, exeName));
 			}
 		}
 		return games;

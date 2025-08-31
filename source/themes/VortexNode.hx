@@ -4,7 +4,6 @@ import flixel.FlxBasic;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
-import util.Logger.Log;
 
 class VortexNode implements IThemeNode
 {
@@ -34,7 +33,6 @@ class VortexNode implements IThemeNode
 	// internal
 	var lastW:Int = 0;
 	var lastH:Int = 0;
-	var loggedOnce:Bool = false;
 
 	public function new(el:ThemeElementSpec, _theme:Theme)
 	{
@@ -143,13 +141,6 @@ class VortexNode implements IThemeNode
 		// opacity takes effect here
 		spr.alpha = opacity;
 
-		// one-time log so you can confirm params are actually applied
-		if (!loggedOnce)
-		{
-			loggedOnce = true;
-			Log.line('[VORTEX] params downscale=' + downscale + ' iter=' + iterations + ' scale=' + scaleUniform + ' mix=' + mixDark + ' opacity=' + opacity
-				+ ' baseSpeed=' + baseSpeed + ' boostDecay=' + boostDecay);
-		}
 	}
 
 	/** Call when user moves carousel to add a momentary kick. */

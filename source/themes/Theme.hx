@@ -1,16 +1,23 @@
 package themes;
 
-import haxe.Json;
-import haxe.io.Path;
-import sys.FileSystem;
-import sys.io.File;
 import flixel.FlxBasic;
+import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
+import flixel.graphics.FlxGraphic;
 import flixel.text.FlxText;
+import flixel.tweens.FlxEase;
+import flixel.tweens.FlxTween;
 import flixel.util.FlxColor;
+import haxe.Json;
+import haxe.io.Path;
+import openfl.display.BitmapData;
+import sys.FileSystem;
+import sys.io.File;
 
-/** ===== Spec ===== */
+using StringTools;
+
+/* ---------------- Spec ---------------- */
 typedef ThemeSpec =
 {
 	var id:String;
@@ -33,7 +40,7 @@ typedef ThemeElementSpec =
 	@:optional var initialVisible:Null<Bool>;
 }
 
-/** ===== Runtime update context ===== */
+/* --------------- Context --------------- */
 typedef Context =
 {
 	var w:Int;
@@ -42,7 +49,7 @@ typedef Context =
 	var resolveVar:(name:String, offset:Int) -> String;
 }
 
-/** ===== Node interface ===== */
+/* --------------- Node interface --------------- */
 interface IThemeNode
 {
 	public var name(get, never):String;
@@ -51,7 +58,7 @@ interface IThemeNode
 	public function update(ctx:Context):Void;
 }
 
-/** ===== Theme ===== */
+/* --------------- Theme --------------- */
 class Theme
 {
 	public var dir:String;
@@ -66,23 +73,20 @@ class Theme
 
 	public static function load(themeDir:String):Theme
 	{
-		var jsonPath = Path.join([themeDir, "theme.json"]);
-		var txt = File.getContent(jsonPath);
-		var spec:ThemeSpec = Json.parse(txt);
+		final jsonPath = Path.join([themeDir, "theme.json"]);
+		final txt = File.getContent(jsonPath);
+		final spec:ThemeSpec = Json.parse(txt);
 		return new Theme(themeDir, spec);
 	}
 
 	public function preloadAssets():Void
 	{
-		// graphics only; everything else is dynamic
 		for (el in spec.elements)
 		{
 			if (el.type == "graphic" && el.source != null && el.source != "" && el.source.charAt(0) != "%")
 			{
-				var abs = resolve(el.source);
-				if (!FileSystem.exists(abs))
-					util.Logger.Log.line("[THEME] Missing asset (preload): " + abs);
-				else
+				final abs = resolve(el.source);
+				if (FileSystem.exists(abs))
 					addToFlixelCache(abs);
 			}
 		}
@@ -101,7 +105,7 @@ class Theme
 				case "carousel": new CarouselNode(el, this);
 				case "vortex": new VortexNode(el, this);
 				default: null;
-			};
+			}
 			if (node != null)
 			{
 				node.addTo(state);
@@ -116,7 +120,6 @@ class Theme
 			n.update(ctx);
 	}
 
-	/** Allow states to grab a node by name (e.g., vortex to nudge) */
 	public function getNodeByName<T:IThemeNode>(name:String):Null<T>
 	{
 		for (n in nodes)
@@ -125,7 +128,52 @@ class Theme
 		return null;
 	}
 
-	/** Resolve a theme-relative path. */
+	// Add near other fields
+	public var _fontCache:Map<String, String> = new Map(); // abs path -> fontName
+
+	public function preloadFonts():Void
+	{
+		// Scan the theme for unique fonts and load once
+		if (spec == null || spec.elements == null)
+			return;
+		for (el in spec.elements)
+		{
+			if (el.type == "text" && el.params != null && Reflect.hasField(el.params, "font"))
+			{
+				var rel:String = Std.string(Reflect.field(el.params, "font"));
+				if (rel != null && rel != "")
+					fontNameFor(rel);
+			}
+		}
+	}
+
+	/** Load font file once and return an OpenFL-registered fontName. */
+	public function fontNameFor(relOrAbs:String):String
+	{
+		var abs = resolve(relOrAbs);
+		var cached = _fontCache.get(abs);
+		if (cached != null)
+			return cached;
+		#if sys
+		try
+		{
+			var f = openfl.text.Font.fromFile(abs);
+			if (f != null)
+			{
+				openfl.text.Font.registerFont(f);
+				var name = f.fontName;
+				_fontCache.set(abs, name);
+				return name;
+			}
+		}
+		catch (_:Dynamic) {}
+		#end
+		// fallback: let Flixel use its default font
+		_fontCache.set(abs, null);
+		return null;
+	}
+
+	/* --------- path helpers --------- */
 	public inline function resolve(relOrAbs:String):String
 	{
 		if (relOrAbs == null || relOrAbs == "")
@@ -139,7 +187,7 @@ class Theme
 	{
 		if (p == null || p == "")
 			return false;
-		var c0 = p.charAt(0);
+		final c0 = p.charAt(0);
 		if (c0 == "/" || c0 == "\\")
 			return true;
 		if (p.length >= 2 && p.charAt(1) == ":")
@@ -147,7 +195,7 @@ class Theme
 		return false;
 	}
 
-	// ---------- param helpers (robust for String/Float/Int JSON) ----------
+	/* --------- param helpers --------- */
 	public static function pFloat(obj:Dynamic, key:String, def:Float):Float
 	{
 		if (obj == null || !Reflect.hasField(obj, key))
@@ -159,7 +207,7 @@ class Theme
 			return (v : Int);
 		if (Std.isOfType(v, String))
 		{
-			var f = Std.parseFloat((v : String));
+			final f = Std.parseFloat((v : String));
 			return Math.isNaN(f) ? def : f;
 		}
 		return def;
@@ -170,14 +218,14 @@ class Theme
 		if (obj == null || !Reflect.hasField(obj, key))
 			return def;
 		var v:Dynamic = Reflect.field(obj, key);
-		var out:Int = def;
+		var out = def;
 		if (Std.isOfType(v, Int))
-			out = v;
+			out = (v : Int);
 		else if (Std.isOfType(v, Float))
 			out = Std.int(v);
 		else if (Std.isOfType(v, String))
 		{
-			var p = Std.parseInt((v : String));
+			final p = Std.parseInt((v : String));
 			out = (p == null) ? def : p;
 		}
 		if (out < min)
@@ -187,12 +235,12 @@ class Theme
 		return out;
 	}
 
-	// ---------- math/placement helpers ----------
+	/* --------- placement / expr --------- */
 	public static inline function evalExpr(expr:String, w:Int, h:Int):Int
 	{
 		if (expr == null)
 			return 0;
-		var e = StringTools.trim(expr);
+		var e = expr.trim();
 		e = e.split("w").join(Std.string(w)).split("h").join(Std.string(h));
 		var total = 0.0;
 		var sign = 1.0;
@@ -215,17 +263,17 @@ class Theme
 			var j = i;
 			while (j < e.length && e.charAt(j) != "+" && e.charAt(j) != "-")
 				j++;
-			var term = StringTools.trim(e.substr(i, j - i));
+			var term = e.substr(i, j - i).trim();
 			var mul = 1.0;
 			for (part in term.split("*"))
 			{
 				var sub = part.split("/");
-				var v = Std.parseFloat(StringTools.trim(sub[0]));
+				var v = Std.parseFloat(sub[0].trim());
 				if (Math.isNaN(v))
 					v = 0;
 				for (k in 1...sub.length)
 				{
-					var d = Std.parseFloat(StringTools.trim(sub[k]));
+					var d = Std.parseFloat(sub[k].trim());
 					if (d == 0)
 						d = 1;
 					v /= d;
@@ -238,64 +286,11 @@ class Theme
 		return Std.int(total);
 	}
 
-	// Inside class Theme
-	public static inline function expandWithOffsets(s:String, ctx:Context):String
-	{
-		if (s == null)
-			return null;
-
-		var out = new StringBuf();
-		var i = 0;
-
-		while (i < s.length)
-		{
-			var ch = s.charAt(i);
-
-			// Look for %TOKEN%
-			if (ch == "%" && i + 1 < s.length)
-			{
-				var j = i + 1;
-				while (j < s.length && s.charAt(j) != "%")
-					j++;
-
-				// Found a closing % -> parse token
-				if (j < s.length && s.charAt(j) == "%")
-				{
-					var token = s.substr(i + 1, j - i - 1); // e.g. TITLE, BOX-1, YEAR+2
-					var name = token;
-					var off = 0;
-
-					// Optional +N / -N offset at the end of the token
-					var plus = token.lastIndexOf("+");
-					var minus = token.lastIndexOf("-");
-					var idx = (plus > 0) ? plus : (minus > 0 ? minus : -1);
-					if (idx > 0)
-					{
-						name = token.substr(0, idx);
-						var ofsStr = token.substr(idx); // includes sign
-						var n = Std.parseInt(ofsStr);
-						if (n != null)
-							off = n;
-					}
-
-					var val = ctx.resolveVar(name, off);
-					out.add(val != null ? val : "");
-					i = j + 1;
-					continue;
-				}
-			}
-			// Not a token; copy char
-			out.add(ch);
-			i++;
-		}
-		return out.toString();
-	}
-
 	public static inline function parseXY(s:String, w:Int, h:Int):{x:Int, y:Int}
 	{
 		if (s == null)
 			return {x: 0, y: 0};
-		var parts = s.split(",");
+		final parts = s.split(",");
 		return {x: evalExpr(parts[0], w, h), y: evalExpr(parts[1], w, h)};
 	}
 
@@ -303,14 +298,14 @@ class Theme
 	{
 		if (s == null)
 			return {w: w, h: h};
-		var parts = s.split(",");
+		final parts = s.split(",");
 		return {w: evalExpr(parts[0], w, h), h: evalExpr(parts[1], w, h)};
 	}
 
 	public static inline function fitContainFlx(s:FlxSprite, x:Int, y:Int, bw:Int, bh:Int):Void
 	{
-		var fw = s.frameWidth;
-		var fh = s.frameHeight;
+		final fw = s.frameWidth;
+		final fh = s.frameHeight;
 		if (fw <= 0 || fh <= 0)
 		{
 			s.visible = false;
@@ -320,60 +315,125 @@ class Theme
 		s.offset.set(0, 0);
 		s.scale.set(1, 1);
 		s.updateHitbox();
-		var sc = Math.min(bw / fw, bh / fh);
+		final sc = Math.min(bw / fw, bh / fh);
 		s.setGraphicSize(Std.int(fw * sc), Std.int(fh * sc));
 		s.updateHitbox();
 		s.setPosition(x + Std.int((bw - s.width) * 0.5), y + Std.int((bh - s.height) * 0.5));
 	}
 
-	// cache helper
-	static function addToFlixelCache(abs:String):Void
+	/* --------- token expander %TITLE+1% --------- */
+	public static inline function expandWithOffsets(s:String, ctx:Context):String
 	{
-		var g = flixel.FlxG.bitmap.get(abs);
-		if (g == null)
+		if (s == null)
+			return null;
+		var out = new StringBuf();
+		var i = 0;
+		while (i < s.length)
 		{
-			try
+			var ch = s.charAt(i);
+			if (ch == "%" && i + 1 < s.length)
 			{
-				var bd = openfl.display.BitmapData.fromFile(abs);
-				g = flixel.FlxG.bitmap.add(bd, false, abs);
-				if (g != null)
+				var j = i + 1;
+				while (j < s.length && s.charAt(j) != "%")
+					j++;
+				if (j < s.length && s.charAt(j) == "%")
 				{
-					g.persist = true;
-					g.destroyOnNoUse = false;
+					var token = s.substr(i + 1, j - i - 1);
+					var name = token;
+					var off = 0;
+					var plus = token.lastIndexOf("+");
+					var minus = token.lastIndexOf("-");
+					var idx = (plus > 0) ? plus : (minus > 0 ? minus : -1);
+					if (idx > 0)
+					{
+						name = token.substr(0, idx);
+						var ofsStr = token.substr(idx);
+						var n = Std.parseInt(ofsStr);
+						if (n != null)
+							off = n;
+					}
+					var val = ctx.resolveVar(name, off);
+					out.add(val != null ? val : "");
+					i = j + 1;
+					continue;
 				}
 			}
-			catch (_:Dynamic) {}
+			out.add(ch);
+			i++;
 		}
+		return out.toString();
+	}
+
+	/* --------- cache helper --------- */
+	static function addToFlixelCache(abs:String):Void
+	{
+		if (!FileSystem.exists(abs))
+			return;
+		var g = FlxG.bitmap.get(abs);
+		if (g != null)
+			return;
+		try
+		{
+			final bd = BitmapData.fromFile(abs);
+			final gr = FlxG.bitmap.add(bd, false, abs);
+			if (gr != null)
+			{
+				gr.persist = true;
+				gr.destroyOnNoUse = false;
+			}
+		}
+		catch (_:Dynamic) {}
+	}
+
+	/** Get a string param from a specific element in the theme JSON. */
+	public function paramString(elementName:String, key:String):Null<String>
+	{
+		for (el in spec.elements)
+		{
+			if (el.name == elementName && el.params != null && Reflect.hasField(el.params, key))
+			{
+				final v:Dynamic = Reflect.field(el.params, key);
+				return (v == null) ? null : Std.string(v);
+			}
+		}
+		return null;
 	}
 }
 
-/* -------------------- existing nodes kept as-is -------------------- */
-// TextNode, GraphicNode, RectNode, CarouselNode
-// (leave your current working versions in place)
-
-/** ===== Nodes ===== */
+/* -------------------- Nodes -------------------- */
 class TextNode implements IThemeNode
 {
 	public var name(get, never):String;
 
+	var _name:String;
 	var spec:ThemeElementSpec;
 	var theme:Theme;
 	var text:FlxText;
-	var _name:String;
+	// change-detection caches
+	var _lastContent:String = null;
+	var _lastColor:Int = 0;
+	var _lastPointSize:Int = -1;
+	var _lastAlign:String = null;
+	var _lastFontRel:String = null;
+	var _lastFieldW:Int = -1;
+	var _lastPosX:Int = -99999;
+	var _lastPosY:Int = -99999;
 
 	public function new(spec:ThemeElementSpec, theme:Theme)
 	{
 		this.spec = spec;
 		this.theme = theme;
 		_name = spec.name;
+
 		text = new FlxText();
 		text.wordWrap = true;
+		text.antialiasing = true;
 	}
 
-	public inline function get_name():String
+	inline function get_name():String
 		return _name;
 
-	public inline function basic():FlxBasic
+	inline public function basic():FlxBasic
 		return text;
 
 	public function addTo(state:FlxState):Void
@@ -382,41 +442,56 @@ class TextNode implements IThemeNode
 	public function update(ctx:Context):Void
 	{
 		var sw = ctx.w, sh = ctx.h;
+		// Position/size: only update if box or pos changes
 		var pos = Theme.parseXY(spec.pos, sw, sh);
-		var w = (spec.size != null) ? Theme.parseWH(spec.size, sw, sh).w : sw;
+		var fieldW = (spec.size != null) ? Theme.parseWH(spec.size, sw, sh).w : sw;
 
-		text.setPosition(pos.x, pos.y);
-		text.fieldWidth = w;
-
-		final str = Theme.expandWithOffsets(spec.content ?? "", ctx);
-		final color = (spec.color != null) ? FlxColor.fromString(spec.color) : FlxColor.WHITE;
-		final size = spec.pointSize != null ? spec.pointSize : 22;
-		final align = spec.align != null ? spec.align : "left";
-
-		// Optional external font from theme
-		var fontName:String = null;
-		if (spec.params != null && spec.params.font != null)
+		if (pos.x != _lastPosX || pos.y != _lastPosY || fieldW != _lastFieldW)
 		{
-			var fontPath:String = Std.string(spec.params.font);
-			if (fontPath != null && fontPath != "")
-			{
-				var abs = theme.resolve(fontPath);
-				#if sys
-				try
-				{
-					var f = Font.fromFile(abs);
-					if (f != null)
-						fontName = f.fontName;
-				}
-				catch (_:Dynamic)
-				{/* ignore */}
-				#end
-			}
+			text.setPosition(pos.x, pos.y);
+			text.fieldWidth = fieldW;
+			_lastPosX = pos.x;
+			_lastPosY = pos.y;
+			_lastFieldW = fieldW;
 		}
 
-		text.setFormat(fontName, size, color, align);
-		text.text = str;
-		text.visible = (str != null && str != "");
+		// Resolve dynamic content (tokens) and properties
+		var raw = (spec.content != null ? spec.content : "");
+		var content = Theme.expandWithOffsets(raw, ctx);
+		var color = (spec.color != null) ? FlxColor.fromString(spec.color) : FlxColor.WHITE;
+		var pointSize = (spec.pointSize != null) ? spec.pointSize : 22;
+		var align = (spec.align != null) ? spec.align : "left";
+
+		var fontRel:String = null;
+		if (spec.params != null && Reflect.hasField(spec.params, "font"))
+		{
+			fontRel = Std.string(Reflect.field(spec.params, "font"));
+			if (fontRel != null && fontRel == "")
+				fontRel = null;
+		}
+
+		// Re-apply font/format ONLY if something changed
+		if (content != _lastContent || color != _lastColor || pointSize != _lastPointSize || align != _lastAlign || fontRel != _lastFontRel)
+		{
+			var fontName:String = null;
+			if (fontRel != null)
+				fontName = theme.fontNameFor(fontRel); // cached & registered once
+
+			text.setFormat(fontName, pointSize, color, align);
+			text.font = fontName;
+
+			text.text = (content == null) ? "" : content;
+
+			_lastContent = content;
+			_lastColor = color;
+			_lastPointSize = pointSize;
+			_lastAlign = align;
+			_lastFontRel = fontRel;
+
+			text.visible = (text.text != "");
+		}
+
+		// else: nothing changed → do nothing this frame
 	}
 }
 
@@ -424,12 +499,12 @@ class GraphicNode implements IThemeNode
 {
 	public var name(get, never):String;
 
+	var _name:String;
 	var spec:ThemeElementSpec;
 	var theme:Theme;
 	var spr:FlxSprite;
-	var _name:String;
 
-	var isDynamic:Bool = false;
+	var isDynamic:Bool;
 	var lastKey:String = null;
 
 	public function new(spec:ThemeElementSpec, theme:Theme)
@@ -439,16 +514,14 @@ class GraphicNode implements IThemeNode
 		_name = spec.name;
 		spr = new FlxSprite();
 		spr.antialiasing = true;
-
-		// Default: visible unless explicitly false OR this is "static"
 		spr.visible = (spec.initialVisible != null) ? spec.initialVisible : (spec.name != "static");
 		isDynamic = (spec.source != null && spec.source.indexOf("%") >= 0);
 	}
 
-	public inline function get_name():String
+	inline function get_name():String
 		return _name;
 
-	public inline function basic():FlxBasic
+	inline public function basic():FlxBasic
 		return spr;
 
 	public function addTo(state:FlxState):Void
@@ -456,67 +529,54 @@ class GraphicNode implements IThemeNode
 
 	public function update(ctx:Context):Void
 	{
-		var sw = ctx.w, sh = ctx.h;
-		var pos = Theme.parseXY(spec.pos, sw, sh);
-		var wh = (spec.size != null) ? Theme.parseWH(spec.size, sw, sh) : {w: 0, h: 0};
+		final sw = ctx.w, sh = ctx.h;
+		final pos = Theme.parseXY(spec.pos, sw, sh);
+		final wh = (spec.size != null) ? Theme.parseWH(spec.size, sw, sh) : {w: 0, h: 0};
 
-		var src = Theme.expandWithOffsets(spec.source ?? "", ctx);
+		final raw = (spec.source != null ? spec.source : "");
+		final src = Theme.expandWithOffsets(raw, ctx);
 		if (src == null || src == "")
 		{
 			spr.visible = false;
 			return;
 		}
+		final abs = theme.resolve(src);
 
-		var abs = theme.resolve(src);
-
-		// --- short-circuit for static nodes: bind once then skip ---
+		// static images: bind once, then only maintain fit/pos
 		if (!isDynamic && lastKey != null)
 		{
-			// size/pos may still need to be enforced (if you resize window),
-			// so keep the fit call using current spr.frame size:
-			var bw = (wh.w > 0) ? wh.w : spr.frameWidth;
-			var bh = (wh.h > 0) ? wh.h : spr.frameHeight;
+			final bw = (wh.w > 0) ? wh.w : spr.frameWidth;
+			final bh = (wh.h > 0) ? wh.h : spr.frameHeight;
 			Theme.fitContainFlx(spr, pos.x, pos.y, bw, bh);
 			return;
 		}
 
 		#if sys
-		if (!sys.FileSystem.exists(abs))
-		{
-			util.Logger.Log.line('[THEME] Missing asset: ' + abs);
-			spr.visible = false;
-			return;
-		}
-		#end
-
 		if (!FileSystem.exists(abs))
 		{
 			spr.visible = false;
 			return;
 		}
+		#end
 
-		// Cache or get
-		var gr:flixel.graphics.FlxGraphic = flixel.FlxG.bitmap.get(abs);
+		var gr:FlxGraphic = FlxG.bitmap.get(abs);
 		if (gr == null)
 		{
 			#if sys
 			try
 			{
-				var bd = openfl.display.BitmapData.fromFile(abs);
+				final bd = BitmapData.fromFile(abs);
 				if (bd != null)
 				{
-					gr = flixel.FlxG.bitmap.add(bd, false, abs);
+					gr = FlxG.bitmap.add(bd, false, abs);
 					if (gr != null)
 					{
-						gr.destroyOnNoUse = false;
 						gr.persist = true;
+						gr.destroyOnNoUse = false;
 					}
 				}
 			}
-			catch (e:Dynamic)
-			{
-				util.Logger.Log.line("[THEME] Load failed: " + abs + " :: " + Std.string(e));
-			}
+			catch (_:Dynamic) {}
 			#end
 		}
 		if (gr == null)
@@ -526,12 +586,10 @@ class GraphicNode implements IThemeNode
 		}
 
 		spr.loadGraphic(gr);
-
-		var bw = (wh.w > 0) ? wh.w : gr.width;
-		var bh = (wh.h > 0) ? wh.h : gr.height;
+		final bw = (wh.w > 0) ? wh.w : gr.width;
+		final bh = (wh.h > 0) ? wh.h : gr.height;
 		Theme.fitContainFlx(spr, pos.x, pos.y, bw, bh);
-		// NOTE: do NOT force spr.visible = true; state controls visibility (for "static")
-		lastKey = abs; // remember what we bound last time
+		lastKey = abs;
 	}
 }
 
@@ -539,9 +597,9 @@ class RectNode implements IThemeNode
 {
 	public var name(get, never):String;
 
+	var _name:String;
 	var spec:ThemeElementSpec;
 	var spr:FlxSprite;
-	var _name:String;
 
 	public function new(spec:ThemeElementSpec)
 	{
@@ -550,10 +608,10 @@ class RectNode implements IThemeNode
 		spr = new FlxSprite();
 	}
 
-	public inline function get_name():String
+	inline function get_name():String
 		return _name;
 
-	public inline function basic():FlxBasic
+	inline public function basic():FlxBasic
 		return spr;
 
 	public function addTo(state:FlxState):Void
@@ -561,10 +619,10 @@ class RectNode implements IThemeNode
 
 	public function update(ctx:Context):Void
 	{
-		var sw = ctx.w, sh = ctx.h;
-		var pos = Theme.parseXY(spec.pos, sw, sh);
-		var wh = Theme.parseWH(spec.size, sw, sh);
-		var col = (spec.color != null) ? FlxColor.fromString(spec.color) : FlxColor.WHITE;
+		final sw = ctx.w, sh = ctx.h;
+		final pos = Theme.parseXY(spec.pos, sw, sh);
+		final wh = Theme.parseWH(spec.size, sw, sh);
+		final col = (spec.color != null) ? FlxColor.fromString(spec.color) : FlxColor.WHITE;
 		spr.makeGraphic(wh.w, wh.h, col);
 		spr.x = pos.x;
 		spr.y = pos.y;
@@ -572,62 +630,128 @@ class RectNode implements IThemeNode
 	}
 }
 
+/* ---------------- Carousel ---------------- */
 class CarouselNode implements IThemeNode
 {
 	public var name(get, never):String;
 
-	inline function get_name()
+	inline function get_name():String
 		return _name;
 
+	// identity
 	var _name:String;
-	var spec:ThemeElementSpec;
-	var theme:Theme;
+	final el:ThemeElementSpec;
+	final theme:Theme;
 
-	var group:FlxTypedGroup<FlxSprite>;
-	var tiles:Int;
-	var tileW:Int;
-	var tileH:Int;
-	var spacing:Int;
-	var centerScale:Float;
-	var sideScale:Float;
-	var farScale:Float;
-	var alphaNear:Float;
-	var alphaFar:Float;
-
+	// display
+	var group:FlxTypedGroup<FlxSprite> = new FlxTypedGroup<FlxSprite>();
 	var sprites:Array<FlxSprite> = [];
-	var lastTiles:Int = -1;
-	var centerSprite:FlxSprite = null;
+	var animating:Bool = false;
 
-	public function new(spec:ThemeElementSpec, theme:Theme)
+	// lane (from pos/size)
+	var laneX:Int = 0;
+	var laneY:Int = 0;
+	var laneW:Int = 0;
+	var laneH:Int = 0;
+	var laneReady:Bool = false;
+
+	// params
+	var tiles:Int = 7;
+	var tileW:Int = 160;
+	var tileH:Int = 100;
+	var spacing:Int = 20;
+	var centerScale:Float = 1.0;
+	var sideScale:Float = 0.9;
+	var farScale:Float = 0.75;
+	var alphaNear:Float = 1.0;
+	var alphaFar:Float = 0.35;
+	var tweenTime:Float = 0.66;
+	var leanDeg:Float = 10.0;
+
+	// derived
+	var mid:Int = 0;
+
+	// tween counter
+	var pending:Int = 0;
+
+	// --- SFX (optional, loaded from theme dir; played via Flixel) ---
+	var sfxMove:FlxSound = null;
+	var sfxStart:FlxSound = null;
+
+	public function new(el:ThemeElementSpec, theme:Theme)
 	{
-		this.spec = spec;
+		this.el = el;
 		this.theme = theme;
-		this._name = spec.name;
+		_name = el.name;
 
-		tiles = getInt("tiles", 7);
-		tileW = getInt("tileW", 150);
-		tileH = getInt("tileH", 90);
-		spacing = getInt("spacing", 18);
-		centerScale = getFloat("centerScale", 1.08);
-		sideScale = getFloat("sideScale", 0.90);
-		farScale = getFloat("farScale", 0.75);
-		alphaNear = getFloat("alphaNear", 1.0);
-		alphaFar = getFloat("alphaFar", 0.35);
+		tiles = Theme.pInt(el.params, "tiles", tiles, 3, 99);
+		tileW = Theme.pInt(el.params, "tileW", tileW, 8, 2000);
+		tileH = Theme.pInt(el.params, "tileH", tileH, 8, 2000);
+		spacing = Theme.pInt(el.params, "spacing", spacing, 0, 2000);
+		centerScale = Theme.pFloat(el.params, "centerScale", centerScale);
+		sideScale = Theme.pFloat(el.params, "sideScale", sideScale);
+		farScale = Theme.pFloat(el.params, "farScale", farScale);
+		alphaNear = Theme.pFloat(el.params, "alphaNear", alphaNear);
+		alphaFar = Theme.pFloat(el.params, "alphaFar", alphaFar);
+		tweenTime = Theme.pFloat(el.params, "tweenTime", tweenTime);
+		leanDeg = Theme.pFloat(el.params, "leanDeg", leanDeg);
 
-		group = new FlxTypedGroup<FlxSprite>();
+		sfxMove = loadThemeSfx("sfxMove");
+		sfxStart = loadThemeSfx("sfxStart");
+
+		mid = Std.int(tiles / 2);
 	}
 
-	inline function getInt(k:String, d:Int):Int
+	inline function loadThemeSfx(key:String):FlxSound
 	{
-		return (spec.params != null && Reflect.hasField(spec.params, k)) ? Std.parseInt(Std.string(Reflect.field(spec.params, k))) : d;
+		if (el.params == null || !Reflect.hasField(el.params, key))
+			return null;
+		var rel:Dynamic = Reflect.field(el.params, key);
+		var relStr = rel == null ? "" : Std.string(rel);
+		if (relStr == "")
+			return null;
+
+		var abs = theme.resolve(relStr);
+		var fx:FlxSound = null;
+		#if sys
+		try
+		{
+			var raw = Sound.fromFile(abs);
+			// Wrap the OpenFL Sound in a FlxSound so we get mute/pause/master volume, etc.
+			fx = FlxG.sound.load(raw, 1.0, false, null, false, false);
+		}
+		catch (_:Dynamic) {}
+		#end
+		return fx;
 	}
 
-	inline function getFloat(k:String, d:Float):Float
+	public inline function playMoveSfx():Void
 	{
-		return (spec.params != null && Reflect.hasField(spec.params, k)) ? Std.parseFloat(Std.string(Reflect.field(spec.params, k))) : d;
+		if (sfxMove != null)
+		{
+			sfxMove.stop(); // avoid stacking many short bleeps
+			sfxMove.play();
+		}
 	}
 
-	public function basic():FlxBasic
+	/** Plays the preloaded start/launch sound if available.
+		Returns true if it will call `cb` on complete; false if no sound. */
+	public function playLaunchSound(cb:Void->Void):Bool
+	{
+		if (sfxStart == null)
+			return false;
+
+		// stop any in-flight playback to avoid overlaps
+		sfxStart.stop();
+		sfxStart.time = 0;
+
+		// Prefer setting onComplete (older/newer Flixel versions both support this member)
+		sfxStart.onComplete = () -> cb();
+		sfxStart.play();
+		return true;
+	}
+
+	public inline function basic():FlxBasic
 		return group;
 
 	public function addTo(state:FlxState):Void
@@ -635,42 +759,241 @@ class CarouselNode implements IThemeNode
 
 	public function update(ctx:Context):Void
 	{
-		var pos = Theme.parseXY(spec.pos, ctx.w, ctx.h);
-		var wh = Theme.parseWH(spec.size, ctx.w, ctx.h);
+		// keep lane rect updated (cheap)
+		var p = Theme.parseXY(el.pos, ctx.w, ctx.h);
+		var s = Theme.parseWH(el.size, ctx.w, ctx.h);
+		laneX = p.x;
+		laneY = p.y;
+		laneW = s.w;
+		laneH = s.h;
+		laneReady = true;
 
-		if (tiles != lastTiles)
+		// lazy build once
+		if (sprites.length == 0)
 		{
-			rebuildSprites();
-			lastTiles = tiles;
+			for (i in 0...tiles)
+			{
+				var sp = new FlxSprite();
+				sp.antialiasing = true;
+				sp.centerOrigin();
+				sp.centerOffsets();
+				sp.origin.y = 0;
+				group.add(sp);
+				sprites.push(sp);
+			}
+			// initial layout from current selection
+			layoutInstant(Globals.selectedIndex);
 		}
+	}
 
-		var totalW = tiles * tileW + (tiles - 1) * spacing;
-		var startX = pos.x + Std.int((wh.w - totalW) * 0.5);
-		var y = pos.y + Std.int((wh.h - tileH) * 0.5);
+	/* ----- public API used by GameSelectState ----- */
+	public inline function isAnimating():Bool
+		return animating;
 
-		var mid = Std.int(tiles / 2);
-		centerSprite = null;
+	public function applySelected(sel:Int):Void
+	{
+		layoutInstant(sel);
+	}
+
+	/** Slide by delta (-1 left / +1 right) using pre-rotation so no sprite crosses the whole row. */
+	public function move(delta:Int, newSel:Int):Void
+	{
+		if (!laneReady || sprites.length == 0 || animating)
+			return;
+
+		var n = (Globals.games != null) ? Globals.games.length : 0;
+		if (n == 0)
+			return;
+
+		playMoveSfx();
+
+		animating = true;
+
+		final rowW = tiles * tileW + (tiles - 1) * spacing;
+		final startX = laneX + Std.int((laneW - rowW) * 0.5);
+		final baseY = laneY + Std.int((laneH - tileH) * 0.5);
+
+		// entering game index at the far edge relative to the *new* selection
+		var enteringOffset = (delta > 0) ? mid : -mid;
+		var enteringGameIdx = wrap(newSel + enteringOffset, n);
+
+		// Pre-rotate and seed the entering sprite just offscreen so every sprite only moves one slot.
+		if (delta > 0)
+		{
+			// moving right => visuals slide left; reuse leftmost as new right entrant
+			var s = sprites.shift();
+			bindGraphicForIndex(s, enteringGameIdx);
+			// size once (contain) so scale tween works consistently
+			if (s.frameWidth > 0 && s.frameHeight > 0)
+			{
+				var fit = Math.min(tileW / s.frameWidth, tileH / s.frameHeight);
+				s.setGraphicSize(Std.int(s.frameWidth * fit), Std.int(s.frameHeight * fit));
+				s.updateHitbox();
+			}
+			s.y = baseY;
+			s.x = slotX(startX, tiles); // one slot beyond right edge
+			sprites.push(s);
+		}
+		else if (delta < 0)
+		{
+			// moving left => visuals slide right; reuse rightmost as new left entrant
+			var s2 = sprites.pop();
+			bindGraphicForIndex(s2, enteringGameIdx);
+			if (s2.frameWidth > 0 && s2.frameHeight > 0)
+			{
+				var fit2 = Math.min(tileW / s2.frameWidth, tileH / s2.frameHeight);
+				s2.setGraphicSize(Std.int(s2.frameWidth * fit2), Std.int(s2.frameHeight * fit2));
+				s2.updateHitbox();
+			}
+			s2.y = baseY;
+			s2.x = slotX(startX, -1); // one slot before left edge
+			sprites.unshift(s2);
+		}
+		// Lean direction: RIGHT key => CCW (negative angle), LEFT key => CW (positive)
+		final lean = (delta > 0) ? -leanDeg : leanDeg;
+
+		pending = 0;
+
+		for (i in 0...tiles)
+		{
+			var sp = sprites[i];
+
+			var targetOffset = i - mid;
+			var targetX = slotX(startX, i);
+			var sc = scaleForOffset(targetOffset);
+			// var al        = alphaForOffset(targetOffset);
+
+			FlxTween.cancelTweensOf(sp);
+			FlxTween.cancelTweensOf(sp.scale);
+
+			// keep lane line steady
+			sp.y = baseY;
+			// sp.alpha = al;
+
+			pending += 2;
+
+			FlxTween.tween(sp, {x: targetX}, tweenTime, {
+				ease: FlxEase.quadOut,
+				onComplete: _ -> onPieceDone()
+			});
+			FlxTween.tween(sp.scale, {x: sc, y: sc}, tweenTime, {
+				ease: FlxEase.quadOut,
+				onComplete: _ -> onPieceDone()
+			});
+
+			// quick lean, bounce back
+			sp.angle = lean;
+			FlxTween.tween(sp, {angle: 0}, tweenTime * 0.9, {
+				ease: FlxEase.backOut,
+				startDelay: 0.02
+			});
+		}
+	}
+
+	inline function slotX(startX:Int, index:Int):Int
+		return startX + index * (tileW + spacing);
+
+	function onPieceDone():Void
+	{
+		pending--;
+		if (pending <= 0)
+			animating = false;
+	}
+
+	/* ----- layout / helpers ----- */
+	function layoutInstant(selected:Int):Void
+	{
+		if (!laneReady || sprites.length == 0)
+			return;
+		final n = (Globals.games != null) ? Globals.games.length : 0;
+		if (n == 0)
+			return;
+
+		final rowW = tiles * tileW + (tiles - 1) * spacing;
+		final startX = laneX + Std.int((laneW - rowW) * 0.5);
+		final baseY = laneY + Std.int((laneH - tileH) * 0.5);
 
 		for (i in 0...tiles)
 		{
 			var offset = i - mid;
-			var s = sprites[i];
+			var gIdx = wrap(selected + offset, n);
 
-			var path = ctx.resolveVar("CART", offset);
-			if (path == null || path == "")
-				path = ctx.resolveVar("BOX", offset);
-			if (path == null || path == "" || !sys.FileSystem.exists(path))
+			var sp = sprites[i];
+			bindGraphicForIndex(sp, gIdx);
+
+			// contain-fit inside tile box
+			if (sp.frameWidth > 0 && sp.frameHeight > 0)
 			{
-				s.visible = false;
-				continue;
+				var fit = Math.min(tileW / sp.frameWidth, tileH / sp.frameHeight);
+				sp.setGraphicSize(Std.int(sp.frameWidth * fit), Std.int(sp.frameHeight * fit));
+				sp.updateHitbox();
 			}
+			var x = slotX(startX, i);
+			var sc = scaleForOffset(offset);
+			// var al = alphaForOffset(offset);
 
-			var gr = FlxG.bitmap.get(path);
-			if (gr == null)
+			sp.x = x;
+			sp.y = baseY;
+			sp.scale.set(sc, sc);
+			// sp.alpha = al;
+			sp.angle = 0;
+		}
+	}
+
+	static inline function wrap(i:Int, n:Int):Int
+	{
+		if (n <= 0)
+			return 0;
+		var r = i % n;
+		return (r < 0) ? r + n : r;
+	}
+
+	function scaleForOffset(off:Int):Float
+	{
+		return switch (Std.int(Math.abs(off)))
+		{
+			case 0: centerScale;
+			case 1: sideScale;
+			default: farScale;
+		}
+	}
+
+	function alphaForOffset(off:Int):Float
+	{
+		return (Math.abs(off) == 0) ? alphaNear : alphaFar;
+	}
+
+	function bindGraphicForIndex(sp:FlxSprite, gameIndex:Int):Void
+	{
+		if (Globals.games == null || gameIndex < 0 || gameIndex >= Globals.games.length)
+		{
+			sp.visible = false;
+			return;
+		}
+		var g = Globals.games[gameIndex];
+		if (g == null)
+		{
+			sp.visible = false;
+			return;
+		}
+		var path = (g.cartPath != null && g.cartPath != "") ? g.cartPath : g.box;
+		#if sys
+		if (path == null || path == "" || !FileSystem.exists(path))
+		{
+			sp.visible = false;
+			return;
+		}
+		#end
+
+		var gr:FlxGraphic = FlxG.bitmap.get(path);
+		if (gr == null)
+		{
+			#if sys
+			try
 			{
-				try
+				final bd = BitmapData.fromFile(path);
+				if (bd != null)
 				{
-					var bd = BitmapData.fromFile(path);
 					gr = FlxG.bitmap.add(bd, false, path);
 					if (gr != null)
 					{
@@ -678,76 +1001,16 @@ class CarouselNode implements IThemeNode
 						gr.destroyOnNoUse = false;
 					}
 				}
-				catch (_:Dynamic) {}
 			}
-			if (gr == null)
-			{
-				s.visible = false;
-				continue;
-			}
-
-			s.loadGraphic(gr);
-			s.setGraphicSize(tileW, tileH);
-			s.updateHitbox();
-
-			s.x = startX + i * (tileW + spacing);
-			s.y = y;
-			s.antialiasing = true;
-			s.visible = true;
-
-			var dist = (offset < 0) ? -offset : offset;
-			var sc = (dist == 0) ? centerScale : (dist == 1 ? sideScale : farScale);
-			var al = (dist == 0) ? alphaNear : alphaFar;
-			s.scale.set(sc, sc);
-			s.alpha = al;
-
-			if (dist == 0)
-				centerSprite = s;
+			catch (_:Dynamic) {}
+			#end
 		}
-
-		if (centerSprite != null)
+		if (gr == null)
 		{
-			group.remove(centerSprite, true);
-			group.add(centerSprite);
+			sp.visible = false;
+			return;
 		}
-	}
-
-	/** Wiggle *all* tiles with tiny stagger and bounce-back. */
-	public function wiggle(direction:Int):Void
-	{
-		// small tilt per tile, fading with distance
-		var mid = Std.int(tiles / 2);
-		for (i in 0...sprites.length)
-		{
-			var s = sprites[i];
-			if (s == null || !s.visible)
-				continue;
-			var offset = i - mid;
-			var dist = (offset < 0) ? -offset : offset;
-
-			flixel.tweens.FlxTween.cancelTweensOf(s);
-			var base = (direction < 0) ? 6 : -6;
-			var amt = base * Math.max(0.25, 1.0 - dist * 0.22);
-			s.angle = amt;
-
-			var delay = dist * 0.02;
-			flixel.tweens.FlxTween.tween(s, {angle: 0}, 0.28, {
-				startDelay: delay,
-				ease: flixel.tweens.FlxEase.backOut
-			});
-		}
-	}
-
-	function rebuildSprites():Void
-	{
-		group.clear();
-		sprites = [];
-		for (_ in 0...tiles)
-		{
-			var s = new FlxSprite();
-			s.antialiasing = true;
-			group.add(s);
-			sprites.push(s);
-		}
+		sp.loadGraphic(gr);
+		sp.visible = true;
 	}
 }
