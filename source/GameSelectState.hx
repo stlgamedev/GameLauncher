@@ -105,6 +105,7 @@ class GameSelectState extends FlxState
 			var g = Globals.games[selected];
 			var go = function()
 			{
+				util.Analytics.recordLaunch(g.id);
 				FlxG.switchState(() -> new LaunchState(g));
 			};
 

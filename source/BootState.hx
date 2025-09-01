@@ -17,6 +17,11 @@ import util.Config;
 import util.GameIndex;
 import util.Logger.Log;
 import util.Paths;
+#if sys
+import haxe.io.Path;
+import sys.FileSystem;
+import sys.io.File;
+#end
 
 class BootState extends FlxState
 {
@@ -26,7 +31,7 @@ class BootState extends FlxState
 	var logo:Aseprite;
 
 	var step:Int = 0;
-	var totalSteps:Int = 7;
+	var totalSteps:Int = 8;
 	var waitUntil:Float = 0;
 
 	override public function create():Void
@@ -93,6 +98,9 @@ class BootState extends FlxState
 				try
 					Paths.ensureContent()
 				catch (_:Dynamic) {}
+				#if sys
+				cleanupLogs();
+				#end
 				Log.line("[BOOT] Content dirs ensured.");
 				stepDone("Content dirs");
 
@@ -120,13 +128,15 @@ class BootState extends FlxState
 				CartBake.TARGET_WIDTH = 200; // tweakable
 				CartBake.buildAll(Globals.games, frameAbs);
 				stepDone("Bake carts");
-
 			case 6:
+				util.Analytics.init(Globals.cfg.contentRootDir);
+				stepDone("Analytics");
+			case 7:
 				// Small grace so first cover has time to cache
 				waitUntil = FlxG.game.ticks / 1000 + 0.35;
 				stepDone("Preload settle");
 
-			case 7:
+			case 8:
 				if ((FlxG.game.ticks / 1000) >= waitUntil)
 				{
 					FlxG.switchState(() -> new GameSelectState());
@@ -135,6 +145,45 @@ class BootState extends FlxState
 
 		updateProgress();
 	}
+
+	#if sys
+	function cleanupLogs():Void
+	{
+		// --- Clean up old logs (>30 days) ---
+		try
+		{
+			var logDir = Globals.cfg.logsRoot; // already normalized by Config
+			if (FileSystem.exists(logDir) && FileSystem.isDirectory(logDir))
+			{
+				var now = Date.now().getTime();
+				var cutoff = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+
+				for (f in FileSystem.readDirectory(logDir))
+				{
+					var abs = Path.join([logDir, f]);
+					try
+					{
+						var stat = FileSystem.stat(abs);
+						var age = now - stat.mtime.getTime();
+						if (age > cutoff)
+						{
+							FileSystem.deleteFile(abs);
+							Globals.log.line("[LOG] Deleted old log: " + abs);
+						}
+					}
+					catch (_:Dynamic)
+					{
+						// ignore bad entries
+					}
+				}
+			}
+		}
+		catch (e:Dynamic)
+		{
+			Globals.log.line("[LOG][ERROR] Failed log cleanup: " + Std.string(e));
+		}
+	}
+	#end
 
 	inline function stepDone(name:String):Void
 	{

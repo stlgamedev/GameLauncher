@@ -26,6 +26,8 @@ class LaunchState extends FlxState
 	var idleTimeout:Float = 300.0; // seconds; will be set from Globals.cfg.idleSecondsGame
 	var hotkeyPressed:Bool = false; // SHIFT+F12 debounce
 
+	var startTimeMs:Float = Date.now().getTime();
+
 	// Optional XInput dynamic
 	#if cpp
 	var XInputGetState:Dynamic = null;
@@ -101,6 +103,14 @@ class LaunchState extends FlxState
 		super.destroy();
 	}
 
+	private function returnToGameSelect():Void
+	{ // duration since we spawned the process
+		var secs = Math.max(0, (Date.now().getTime() - startTimeMs) / 1000.0);
+		util.Analytics.recordSession(game.id, secs);
+
+		FlxG.switchState(() -> new GameSelectState());
+	}
+
 	override public function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
@@ -109,7 +119,7 @@ class LaunchState extends FlxState
 		#if sys
 		if (procExited)
 		{
-			FlxG.switchState(() -> new GameSelectState());
+			returnToGameSelect();
 			return;
 		}
 		#end
@@ -117,7 +127,7 @@ class LaunchState extends FlxState
 		// Safety: allow ESC to return if not kiosk
 		if (Globals.cfg.mode != "kiosk" && FlxG.keys.justPressed.ESCAPE)
 		{
-			FlxG.switchState(() -> new GameSelectState());
+			returnToGameSelect();
 			return;
 		}
 	}
