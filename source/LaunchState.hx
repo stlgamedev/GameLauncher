@@ -104,7 +104,8 @@ class LaunchState extends FlxState
 	}
 
 	private function returnToGameSelect():Void
-	{ // duration since we spawned the process
+	{
+		// duration since we spawned the process
 		var secs = Math.max(0, (Date.now().getTime() - startTimeMs) / 1000.0);
 		util.Analytics.recordSession(game.id, secs);
 
@@ -124,12 +125,18 @@ class LaunchState extends FlxState
 		}
 		#end
 
-		// Safety: allow ESC to return if not kiosk
-		if (Globals.cfg.mode != "kiosk" && FlxG.keys.justPressed.ESCAPE)
+		// Config-driven "Back" (or ESC fallback): kill game and return
+		if (backPressed())
 		{
-			returnToGameSelect();
+			killProcessAndExit();
 			return;
 		}
+	}
+
+	/* ---------------------- input helper ---------------------- */
+	inline function backPressed():Bool
+	{
+		return Globals.input.justPressed(Action.Back);
 	}
 
 	/* ---------------------- layout helpers ---------------------- */
@@ -169,7 +176,7 @@ class LaunchState extends FlxState
 	function launchGameAsync():Void
 	{
 		#if sys
-		var exe:String = game.exe; // you requested this explicit usage
+		var exe:String = game.exe; // explicit field you added
 		if (exe == null || exe == "" || !FileSystem.exists(exe))
 		{
 			Globals.log.line("[LAUNCH][ERROR] Executable missing: " + exe);
@@ -255,6 +262,38 @@ class LaunchState extends FlxState
 	function returnToMenuSoon():Void
 	{
 		FlxTween.num(0, 1, 0.25, {onComplete: _ -> FlxG.switchState(() -> new GameSelectState())});
+	}
+
+	// Kill the running game (soft; hard on Windows), then return
+	function killProcessAndExit():Void
+	{
+		#if sys
+		try
+		{
+			if (proc != null)
+			{
+				// Soft kill first
+				try
+					proc.kill()
+				catch (_:Dynamic) {}
+
+				// If still alive, use a hard kill on Windows
+				#if windows
+				try
+				{
+					var pid = proc.getPid();
+					var tk = new sys.io.Process("cmd", ["/c", "taskkill", "/PID", Std.string(pid), "/T", "/F"]);
+					tk.close();
+				}
+				catch (_:Dynamic) {}
+				#end
+			}
+		}
+		catch (_:Dynamic) {}
+		#end
+
+		// Flag for main loop to bounce back
+		procExited = true;
 	}
 
 	/* ---------------------- Idle + Hotkey (Windows / C++) ---------------------- */

@@ -7,7 +7,7 @@
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
 
-<set name="BUILD_DIR" value="export6" />
+<set name="BUILD_DIR" value="export7" />
 
 
 	<source path="source" />
@@ -17,6 +17,7 @@
 	<haxelib name="flixel" />
 
 <haxelib name="openfl-aseprite" />
+<haxelib name="hxCodec" />
 
 
 

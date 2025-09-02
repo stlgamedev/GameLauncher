@@ -90,6 +90,8 @@ class BootState extends FlxState
 			case 1:
 				// Config
 				Globals.cfg = Config.loadOrCreate();
+				util.InputMap.inst.configure(Globals.cfg.controlsKeys, Globals.cfg.controlsPads);
+
 				Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir + ", theme=" + Globals.cfg.theme);
 				stepDone("Config");
 

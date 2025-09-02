@@ -35,6 +35,8 @@ import util.Config;
 import util.GameEntry;
 import util.GameIndex;
 import util.Globals;
+import util.InputMap.Action;
+import util.InputMap;
 import util.Logger.Log;
 import util.Logger;
 import util.Paths;

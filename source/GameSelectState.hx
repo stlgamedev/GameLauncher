@@ -5,6 +5,7 @@ import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
 import flixel.util.FlxTimer;
+import util.InputMap.Action;
 
 using StringTools;
 
@@ -16,6 +17,7 @@ class GameSelectState extends FlxState
 	var nodeMap:Map<String, FlxBasic> = new Map();
 	var staticTimer:FlxTimer;
 	var launching:Bool = false;
+	var idleMenuTimer:Float = 0;
 
 	override public function create():Void
 	{
@@ -49,19 +51,30 @@ class GameSelectState extends FlxState
 		// Always tick theme animations (vortex, etc.)
 		theme.updateAll(makeContext());
 
-		// Hard admin exits
-		if (Globals.cfg.mode != "kiosk" && FlxG.keys.justPressed.ESCAPE)
-		{
-			Sys.exit(0);
-		}
-		if (FlxG.keys.justPressed.F12 && FlxG.keys.pressed.SHIFT && FlxG.keys.pressed.ALT)
-		{
-			Sys.exit(0);
-		}
-
 		// If we're launching, ignore all inputs (still let background animate)
 		if (launching)
 		{
+			return;
+		}
+		if (Globals.input.justPressed(Action.AdminExit))
+		{
+			Sys.exit(0);
+			return;
+		}
+
+		final left = Globals.input.justPressed(Action.Prev);
+		final right = Globals.input.justPressed(Action.Next);
+		final enter = Globals.input.justPressed(Action.Select);
+
+		if (left || right || enter)
+			idleMenuTimer = 0;
+		else
+		{
+			idleMenuTimer += elapsed;
+			if (Globals.cfg != null && idleMenuTimer >= Globals.cfg.idleSecondsMenu)
+			{
+				FlxG.switchState(() -> new AttractState());
+			}
 			return;
 		}
 
@@ -72,9 +85,9 @@ class GameSelectState extends FlxState
 		if (canNavigate)
 		{
 			var delta = 0;
-			if (FlxG.keys.justPressed.LEFT || FlxG.keys.justPressed.A)
+			if (left)
 				delta = -1;
-			if (FlxG.keys.justPressed.RIGHT || FlxG.keys.justPressed.D)
+			if (right)
 				delta = 1;
 
 			if (delta != 0 && Globals.games.length > 0)
@@ -98,7 +111,7 @@ class GameSelectState extends FlxState
 		}
 
 		// Launch game on ENTER (theme-provided launch sound, then switch)
-		if (Globals.games.length > 0 && FlxG.keys.justPressed.ENTER)
+		if (Globals.games.length > 0 && enter)
 		{
 			launching = true; // lock all inputs
 
@@ -112,7 +125,7 @@ class GameSelectState extends FlxState
 			var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
 			if (car != null && car.playLaunchSound(go))
 			{
-				// switch happens in onComplete
+				// switch happens Globals.input onComplete
 			}
 			else
 			{
