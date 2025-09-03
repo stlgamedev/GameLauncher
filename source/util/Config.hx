@@ -8,65 +8,51 @@ using StringTools;
 
 /**
  * Launcher configuration loader/writer.
- * 
- * Key points:
- * - Unifies controls under a single [Controls] section (string lists per action).
- * - Provides compatibility getters `controlsKeys` and `controlsPads`
- *   so existing InputMap.configure(keys, pads) continues to work.
- * - Writes a very detailed settings.cfg with instructions/comments.
+ *
+ * Creates and reads "settings.cfg".
  */
 class Config
 {
-	// ------------ General ------------
 	public var mode:String; // "normal" | "kiosk"
 	public var theme:String; // theme id (e.g., "default")
-	public var idleSecondsMenu:Int; // to enter attract mode
-	public var idleSecondsGame:Int; // idle kill inside a launched game
+
+	public var idleSecondsMenu:Int; // time to enter attract mode
+	public var idleSecondsGame:Int; // idle kill inside game
 	public var logsRollDaily:Bool; // roll logs per day
 
-	// ------------ Paths ------------
-	public var contentRootDir:String; // path to games/trailers root (can be absolute)
-	public var logsRoot:String; // path to logs dir (can be absolute)
+	public var contentRootDir:String; // absolute or relative
+	public var logsRoot:String; // absolute or relative
 
-	// ------------ Content / Update ------------
 	public var subscriptions:Array<String>;
 	public var autoUpdate:Bool;
 	public var checkOnBoot:Bool;
 	public var scheduleDaily:String; // "HH:MM"
 	public var serverBase:String; // URL
 
-	// ------------ Controls (unified) ------------
-	// "action" -> "comma,separated,tokens"
-	public var controls:Map<String, String>;
-
-	// Back-compat views for InputMap.configure():
-	public var controlsKeys(get, never):Map<String, Array<String>>;
-	public var controlsPads(get, never):Map<String, Array<String>>;
+	// Controls (merged later into InputMap)
+	public var controlsKeys:Map<String, Array<String>>;
+	public var controlsPads:Map<String, Array<String>>;
 
 	public static var CFG_FILE = "settings.cfg";
 
 	public function new() {}
 
-	// ---------------- Public API ----------------
-
+	/* ---------------- Public API ---------------- */
 	public static function loadOrCreate():Config
 	{
 		if (!FileSystem.exists(CFG_FILE))
 		{
 			var c = defaults();
-
-			// ensure parent dir exists
-			var cfgDir = Path.directory(CFG_FILE);
-			if (cfgDir != "" && !FileSystem.exists(cfgDir))
-			{
-				try
-					FileSystem.createDirectory(cfgDir)
-				catch (_:Dynamic) {}
-			}
+			ensureParentDir(CFG_FILE);
 			try
-				File.saveContent(CFG_FILE, defaultsIni())
-			catch (_:Dynamic) {}
-
+			{
+				File.saveContent(CFG_FILE, defaultsIni());
+				Log.line("[CFG] Created default " + CFG_FILE);
+			}
+			catch (e:Dynamic)
+			{
+				Log.line("[CFG][ERROR] Failed to write defaults: " + Std.string(e));
+			}
 			finalizePaths(c);
 			return c;
 		}
@@ -74,8 +60,9 @@ class Config
 		var text = "";
 		try
 			text = File.getContent(CFG_FILE)
-		catch (_:Dynamic)
+		catch (e:Dynamic)
 		{
+			Log.line("[CFG][ERROR] Could not read " + CFG_FILE + ": " + Std.string(e));
 			var c = defaults();
 			finalizePaths(c);
 			return c;
@@ -86,8 +73,7 @@ class Config
 		return cfg;
 	}
 
-	// ---------------- Internals ----------------
-
+	/* ---------------- Internals ---------------- */
 	static function defaults():Config
 	{
 		var c = new Config();
@@ -98,25 +84,33 @@ class Config
 
 		#if debug
 		c.contentRootDir = normalizePath("P:\\LauncherExternals\\");
-		c.theme = "arcade-jam-2018";
+		c.theme = "arcade-jam-2017";
 		#else
 		c.contentRootDir = "external";
 		c.theme = "default";
 		#end
 
 		c.logsRoot = "logs";
-		c.subscriptions = ["ArcadeJam01"];
+		c.subscriptions = ["Demos", "ArcadeJam01"];
 		c.autoUpdate = false;
 		c.checkOnBoot = true;
 		c.scheduleDaily = "08:00";
 		c.serverBase = "https://sgd.axolstudio.com/launcher";
-		// Your requested defaults with gamepads:
-		c.controls = new Map();
-		c.controls.set("prev", "LEFT, A, PAD_LEFT");
-		c.controls.set("next", "RIGHT, D, PAD_RIGHT");
-		c.controls.set("select", "ENTER, SPACE, COMMA, SLASH, PAD_A, PAD_START");
-		c.controls.set("back", "ESCAPE, PAD_SELECT");
-		c.controls.set("admin_exit", "SHIFT+F12");
+		// Controls defaults (lowercase tokens; InputMap will normalize)
+		c.controlsKeys = [
+			"prev" => ["left", "a"],
+			"next" => ["right", "d"],
+			"select" => ["enter", "space", "comma", "slash"],
+			"back" => ["escape"],
+			"admin_exit" => ["shift+f12"]
+		];
+		c.controlsPads = [
+			"prev" => ["pad_left"],
+			"next" => ["pad_right"],
+			"select" => ["pad_a", "pad_start"],
+			"back" => ["pad_select"],
+			"admin_exit" => [] // keyboard-only by default
+		];
 
 		return c;
 	}
@@ -124,82 +118,89 @@ class Config
 	static function defaultsIni():String
 	{
 		#if debug
-		var debugContent = "P:\\LauncherExternals\\";
-		var theme = "arcade-jam-2018";
+		var content = "P:\\LauncherExternals\\";
+		var theme = "arcade-jam-2017";
 		#else
-		var debugContent = "external";
+		var content = "external";
 		var theme = "default";
 		#end
 
-		// Heavily commented, human-friendly config
-		return "# ==============================================================\n"
-			+ "#  Arcade Launcher - Settings\n"
-			+ "#  Any line starting with # is a comment.\n"
-			+ "#  Use either 'key = value' or 'key: value' formats.\n"
-			+ "#  Strings do not need quotes unless they include '=' or ':'.\n"
-			+ "#\n"
-			+ "#  CONTROLS OVERVIEW\n"
-			+ "#  -----------------\n"
-			+ "#  Controls live in the [Controls] section as comma-separated lists\n"
-			+ "#  per action (case-insensitive, whitespace ignored around commas).\n"
-			+ "#\n"
-			+ "#  Actions you can set:\n"
-			+ "#    prev, next  -> Move selection in the carousel.\n"
-			+ "#    select      -> Launch / confirm.\n"
-			+ "#    back        -> Go back / request exit (LaunchState listens for this).\n"
-			+ "#    admin_exit  -> Admin-only emergency exit (SHIFT+F12 recommended).\n"
-			+ "#\n"
-			+ "#  Keyboard tokens (examples):\n"
-			+ "#    LEFT, RIGHT, UP, DOWN, ENTER, SPACE, COMMA, SLASH, A, D, ESCAPE, SHIFT, F12\n"
-			+ "#\n"
-			+ "#  Gamepad tokens: prefix with PAD_\n"
-			+ "#    PAD_A, PAD_B, PAD_X, PAD_Y, PAD_START, PAD_SELECT (alias of PAD_BACK), PAD_BACK,\n"
-			+ "#    PAD_LEFT, PAD_RIGHT, PAD_UP, PAD_DOWN\n"
-			+ "#\n"
-			+ "#  Examples:\n"
-			+ "#    prev = LEFT, A, PAD_LEFT\n"
-			+ "#    admin_exit = SHIFT+F12\n"
-			+ "#\n"
-			+ "#  PATHS\n"
-			+ "#  -----\n"
-			+ "#  'content_root' should contain 'games', 'trailers', and 'themes'.\n"
-			+ "#  'logs_root' is where daily logs are written.\n"
-			+ "# ==============================================================\n"
-			+ "\n"
-			+ "[General]\n"
-			+ "mode = normal              # normal | kiosk\n"
-			+ "theme = "
+		return "
+; ============================================================
+; Game Launcher Settings
+; ------------------------------------------------------------
+; Lines beginning with ';' are comments.
+; Do not put comments after values on the same line.
+; All keys are case-insensitive. Lists use commas.
+;
+; Controls:
+;   - Put keyboard inputs in [Controls.Keys] and gamepad in [Controls.Pads].
+;   - Valid keyboard names (examples):
+;       left,right,up,down, enter,space,escape, comma,slash, a,d, shift,f12
+;     (Use \"shift+f12\" for the admin combo.)
+;   - Valid gamepad names (XInput-style):
+;       pad_a,pad_b,pad_x,pad_y, pad_start,pad_select, pad_left,pad_right,pad_up,pad_down
+;   - Actions:
+;       prev, next  : move selection
+;       select      : start/confirm
+;       back        : cancel/return
+;       admin_exit  : privileged backdoor (defaults to shift+f12)
+; ============================================================
+
+[General]
+; mode: \"normal\" (demo machines) or \"kiosk\" (arcade mapping only)
+mode = normal
+; theme folder name in external/themes/
+theme = "
 			+ theme
-			+ "             # theme folder name under 'external/themes'\n"
-			+ "idle_seconds_menu = 180    # seconds of inactivity at menu before attract mode\n"
-			+ "idle_seconds_game = 300    # seconds of inactivity inside a game before forced exit (Windows builds)\n"
-			+ "logs_roll_daily = true     # write logs with a daily suffix\n"
-			+ "\n"
-			+ "[Paths]\n"
-			+ "content_root = "
-			+ debugContent
-			+ "  # root containing 'games', 'trailers', 'themes'\n"
-			+ "logs_root = logs              # folder for logs (created if missing)\n"
-			+ "\n"
-			+ "[Content]\n"
-			+ "subscriptions = ArcadeJam01  # comma-separated IDs you plan to sync\n"
-			+ "\n"
-			+ "[Update]\n"
-			+ "auto_update = false\n"
-			+ "check_on_boot = true\n"
-			+ "schedule_daily = 08:00\n"
-			+ "server_base = https://sgd.axolstudio.com/launcher\n"
-			+ "\n"
-			+ "[Controls]\n"
-			+ "# prev/next: move selection in the carousel\n"
-			+ "prev = LEFT, A, PAD_LEFT\n"
-			+ "next = RIGHT, D, PAD_RIGHT\n"
-			+ "# select: confirm / launch\n"
-			+ "select = ENTER, SPACE, COMMA, SLASH, PAD_A, PAD_START\n"
-			+ "# back: go back from a submenu (also used by LaunchState to request game exit)\n"
-			+ "back = ESCAPE, PAD_SELECT\n"
-			+ "# admin_exit: privileged hotkey to immediately exit a running game (Windows global hotkey) or the app when at menu\n"
-			+ "admin_exit = SHIFT+F12\n";
+			+ "
+
+; idle thresholds (seconds)
+idle_seconds_menu = 180
+idle_seconds_game = 300
+
+; roll logs daily (creates a new file per day)
+logs_roll_daily = true
+
+
+[Paths]
+; where games/, trailers/, themes/ live
+content_root = "
+			+ content
+			+ "
+; where logs/ go
+logs_root = logs
+
+
+[Content]
+; comma-separated content channels to show
+subscriptions = ArcadeJam01
+
+
+[Update]
+auto_update = false
+check_on_boot = true
+schedule_daily = 08:00
+server_base = https://sgd.axolstudio.com/launcher
+
+
+; ---------------- Controls ----------------
+; Keyboard bindings
+[Controls.Keys]
+prev = left, a
+next = right, d
+select = enter, space, comma, slash
+back = escape
+admin_exit = shift+f12
+
+; Gamepad bindings (XInput-style)
+[Controls.Pads]
+prev = pad_left
+next = pad_right
+select = pad_a, pad_start
+back = pad_select
+admin_exit =
+";
 	}
 
 	static function fromIni(ini:String):Config
@@ -209,10 +210,11 @@ class Config
 
 		for (rawLine in ini.split("\n"))
 		{
-			var line = StringTools.trim(rawLine);
-			if (line == "" || startsWithAny(line, ["#", ";", "//"]))
+			var line = rawLine.trim();
+			if (line == "" || startsWithAny(line, [";", "#", "//"]))
 				continue;
 
+			// Section header
 			if (line.charAt(0) == "[" && line.charAt(line.length - 1) == "]")
 			{
 				section = line.substr(1, line.length - 2);
@@ -222,8 +224,7 @@ class Config
 			var kv = parseKeyValue(line);
 			if (kv == null)
 				continue;
-			var k = kv.key;
-			var v = kv.value;
+			var k = kv.key, v = kv.value;
 
 			switch section
 			{
@@ -263,16 +264,26 @@ class Config
 						default:
 					}
 
-				case "Controls":
-					if (c.controls == null)
-						c.controls = new Map();
-					c.controls.set(k.toLowerCase(), v);
+				case "Controls.Keys":
+					setMapList(c.controlsKeys, k, v);
+
+				case "Controls.Pads":
+					setMapList(c.controlsPads, k, v);
+
 				default:
 			}
 		}
 
-		util.Logger.Log.line('[CFG] Loaded: mode=${c.mode}, theme=${c.theme}, content_root=${c.contentRootDir}, logs_root=${c.logsRoot}');
+		Log.line('[CFG] Loaded: mode=${c.mode}, theme=${c.theme}, content_root=${c.contentRootDir}, logs_root=${c.logsRoot}');
 		return c;
+	}
+
+	static function setMapList(m:Map<String, Array<String>>, key:String, value:String):Void
+	{
+		if (m == null)
+			m = new Map();
+		var a = parseList(value); // keep lower-case; InputMap will normalize
+		m.set(key.toLowerCase(), a);
 	}
 
 	static function finalizePaths(c:Config):Void
@@ -283,63 +294,7 @@ class Config
 		ensureDir(c.logsRoot);
 	}
 
-	// ---------------- Compatibility getters ----------------
-
-	inline function isPadToken(tok:String):Bool
-	{
-		return tok != null && tok.toUpperCase().indexOf("PAD_") == 0;
-	}
-
-	function get_controlsKeys():Map<String, Array<String>>
-	{
-		var out = new Map<String, Array<String>>();
-		if (controls != null)
-		{
-			for (action in controls.keys())
-			{
-				var line = controls.get(action);
-				var arr = new Array<String>();
-				if (line != null && line != "")
-				{
-					for (raw in line.split(","))
-					{
-						var tok = StringTools.trim(raw);
-						if (tok != "" && !isPadToken(tok))
-							arr.push(tok.toUpperCase());
-					}
-				}
-				out.set(action, arr);
-			}
-		}
-		return out;
-	}
-
-	function get_controlsPads():Map<String, Array<String>>
-	{
-		var out = new Map<String, Array<String>>();
-		if (controls != null)
-		{
-			for (action in controls.keys())
-			{
-				var line = controls.get(action);
-				var arr = new Array<String>();
-				if (line != null && line != "")
-				{
-					for (raw in line.split(","))
-					{
-						var tok = StringTools.trim(raw);
-						if (tok != "" && isPadToken(tok))
-							arr.push(tok.toUpperCase());
-					}
-				}
-				out.set(action, arr);
-			}
-		}
-		return out;
-	}
-
-	// ---------------- Helpers ----------------
-
+	/* ---------------- Helpers ---------------- */
 	static function startsWithAny(s:String, prefixes:Array<String>):Bool
 	{
 		for (p in prefixes)
@@ -356,15 +311,15 @@ class Config
 		if (idx <= 0)
 			return null;
 
-		var key = StringTools.trim(line.substr(0, idx));
-		var value = StringTools.trim(line.substr(idx + 1));
+		var key = line.substr(0, idx).trim();
+		var value = line.substr(idx + 1).trim();
 
-		// Strip surrounding quotes if present
-		if (value.length >= 2
-			&& ((value.charAt(0) == '"' && value.charAt(value.length - 1) == '"')
-				|| (value.charAt(0) == '\'' && value.charAt(value.length - 1) == '\'')))
+		// Strip quotes around entire value (optional)
+		if (value.length >= 2)
 		{
-			value = value.substr(1, value.length - 2);
+			var a = value.charAt(0), b = value.charAt(value.length - 1);
+			if ((a == '"' && b == '"') || (a == "'" && b == "'"))
+				value = value.substr(1, value.length - 2);
 		}
 		return {key: key, value: value};
 	}
@@ -374,12 +329,13 @@ class Config
 		var parts = v.split(",");
 		if (parts.length == 1 && v.indexOf(";") >= 0)
 			parts = v.split(";");
+
 		var out = new Array<String>();
 		for (p in parts)
 		{
-			var s = StringTools.trim(p);
+			var s = p.trim();
 			if (s != "")
-				out.push(s);
+				out.push(s.toLowerCase());
 		}
 		return out;
 	}
@@ -398,6 +354,17 @@ class Config
 		if (t == "false" || t == "0" || t == "no" || t == "off")
 			return false;
 		return fallback;
+	}
+
+	static function ensureParentDir(path:String):Void
+	{
+		var dir = Path.directory(path);
+		if (dir != "" && !FileSystem.exists(dir))
+		{
+			try
+				FileSystem.createDirectory(dir)
+			catch (_:Dynamic) {}
+		}
 	}
 
 	public static function normalizePath(p:String):String
@@ -425,7 +392,12 @@ class Config
 		{
 			if (!FileSystem.exists(dir))
 				FileSystem.createDirectory(dir);
+			else if (!FileSystem.isDirectory(dir))
+				Log.line("[CFG][WARN] Path exists but is not a directory: " + dir);
 		}
-		catch (_:Dynamic) {}
+		catch (e:Dynamic)
+		{
+			Log.line("[CFG][ERROR] Could not ensure directory: " + dir + " :: " + Std.string(e));
+		}
 	}
 }
