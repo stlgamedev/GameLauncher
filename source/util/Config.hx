@@ -84,7 +84,7 @@ class Config
 
 		#if debug
 		c.contentRootDir = normalizePath("P:\\LauncherExternals\\");
-		c.theme = "arcade-jam-2017";
+		c.theme = "arcade-jam-2018";
 		#else
 		c.contentRootDir = "external";
 		c.theme = "default";
@@ -119,7 +119,7 @@ class Config
 	{
 		#if debug
 		var content = "P:\\LauncherExternals\\";
-		var theme = "arcade-jam-2017";
+		var theme = "arcade-jam-2018";
 		#else
 		var content = "external";
 		var theme = "default";

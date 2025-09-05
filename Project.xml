@@ -1,13 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <project xmlns="http://lime.openfl.org/project/1.0.4"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
 
-	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="0.1.0" company="STLGameDev" />
+	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="0.1.0"
+		company="STLGameDev" />
 
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
 
-<set name="BUILD_DIR" value="export7" />
+	<set name="BUILD_DIR" value="export8" />
 
 
 	<source path="source" />
@@ -16,9 +18,10 @@
 
 	<haxelib name="flixel" />
 
-<haxelib name="openfl-aseprite" />
-<haxelib name="hxCodec" />
-
+	<haxelib name="openfl-aseprite" />
+	<haxelib name="hxCodec" />
+	<haxelib name="haxeui-core" />
+	<haxelib name="haxeui-flixel" />
 
 
 	<haxedef name="FLX_NO_HEALTH" />
@@ -26,27 +29,23 @@
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
 
 	<haxedef name="HXCPP_STACK_TRACE" if="debug" />
-<haxedef name="HXCPP_STACK_LINE" if="debug" />
-
-
+	<haxedef name="HXCPP_STACK_LINE" if="debug" />
 
 
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
-<architecture name="x64" if="windows" />
+	<architecture name="x64" if="windows" />
 
 
-<haxedef name="import" value="Import" />
+	<haxedef name="import" value="Import" />
 
 
-
-<haxedef name="dce=full" if="release" />
-<haxedef name="HXCPP_STRIP" if="release" />
-<haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
-
+	<haxedef name="dce=full" if="release" />
+	<haxedef name="HXCPP_STRIP" if="release" />
+	<haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
 
 
-<haxedef name="no-console" if="windows" />
-<haxedef name="noInlineImport" />
+	<haxedef name="no-console" if="windows" />
+	<haxedef name="noInlineImport" />
 
 
 	<!-- Icon (optional) -->

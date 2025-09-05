@@ -1,22 +1,5 @@
 package;
 
-import aseprite.Aseprite;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.FlxState;
-import flixel.text.FlxText;
-import flixel.util.FlxColor;
-import flixel.util.FlxDestroyUtil;
-import haxe.io.Path as HxPath;
-import openfl.Assets;
-import openfl.display.BitmapData;
-import openfl.display.Sprite;
-import openfl.geom.Matrix;
-import util.CartBake;
-import util.Config;
-import util.GameIndex;
-import util.Logger.Log;
-import util.Paths;
 #if sys
 import haxe.io.Path;
 import sys.FileSystem;
@@ -38,6 +21,7 @@ class BootState extends FlxState
 	{
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
+		FlxG.mouse.visible = FlxG.mouse.enabled = false;
 
 		label = new FlxText(0, Std.int(FlxG.height * 0.60), FlxG.width, "Loading…");
 		label.setFormat(null, 24, FlxColor.WHITE, "center");
@@ -130,9 +114,11 @@ class BootState extends FlxState
 				CartBake.TARGET_WIDTH = 200; // tweakable
 				CartBake.buildAll(Globals.games, frameAbs);
 				stepDone("Bake carts");
+
 			case 6:
 				util.Analytics.init(Globals.cfg.contentRootDir);
 				stepDone("Analytics");
+
 			case 7:
 				// Small grace so first cover has time to cache
 				waitUntil = FlxG.game.ticks / 1000 + 0.35;

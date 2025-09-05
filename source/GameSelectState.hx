@@ -1,11 +1,6 @@
 package;
 
-import flixel.FlxBasic;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.FlxState;
-import flixel.util.FlxTimer;
-import util.InputMap.Action;
+
 
 using StringTools;
 
@@ -174,16 +169,29 @@ class GameSelectState extends FlxState
 		return {
 			w: sw,
 			h: sh,
-			themeDir: Globals.theme != null ? Globals.theme.dir : "external/themes/arcade-jam-2017",
+			themeDir: theme.dir,
 			resolveVar: (name:String, offset:Int) ->
 			{
-				final n = Globals.games.length;
+				var n = Globals.games.length;
 				if (n == 0)
 					return "";
+
 				var idx = (selected + offset) % n;
 				if (idx < 0)
 					idx += n;
-				final g = Globals.games[idx];
+				var g = Globals.games[idx];
+
+				// --- dynamic GENREn support ---
+				// %GENRE1%, %GENRE2%, %GENRE3%, ... (1-based indices)
+				if (name != null && StringTools.startsWith(name, "GENRE"))
+				{
+					var numStr = name.substr(5); // chars after "GENRE"
+					var k = Std.parseInt(numStr);
+					if (k != null && k > 0 && g.genres != null && k - 1 < g.genres.length)
+						return g.genres[k - 1];
+					return "";
+				}
+
 				return switch (name)
 				{
 					case "TITLE": g.title;
@@ -193,6 +201,7 @@ class GameSelectState extends FlxState
 					case "DESC": (g.description != null) ? g.description : "";
 					case "BOX": (g.box != null) ? g.box : "";
 					case "CART": (g.cartPath != null) ? g.cartPath : (g.box != null ? g.box : "");
+					case "PLAYERS": ""; // not in GameEntry yet; leave blank so the UI doesn't break
 					default: "";
 				}
 			}

@@ -1,19 +1,6 @@
 package themes;
 
-import flixel.FlxBasic;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.FlxState;
-import flixel.graphics.FlxGraphic;
-import flixel.text.FlxText;
-import flixel.tweens.FlxEase;
-import flixel.tweens.FlxTween;
-import flixel.util.FlxColor;
-import haxe.Json;
-import haxe.io.Path;
-import openfl.display.BitmapData;
-import sys.FileSystem;
-import sys.io.File;
+
 
 using StringTools;
 
@@ -104,6 +91,8 @@ class Theme
 				case "rect": new RectNode(el);
 				case "carousel": new CarouselNode(el, this);
 				case "vortex": new VortexNode(el, this);
+				case "glass": new GlassNode(el);
+				case "genres": new GenresNode(el, this);
 				default: null;
 			}
 			if (node != null)
@@ -1012,5 +1001,337 @@ class CarouselNode implements IThemeNode
 		}
 		sp.loadGraphic(gr);
 		sp.visible = true;
+	}
+}
+
+private class GlassNode implements IThemeNode
+{
+	public var name(get, never):String;
+
+	inline function get_name():String
+		return _name;
+
+	var _name:String;
+	var spec:ThemeElementSpec;
+
+	var spr:FlxSprite;
+	var lastW:Int = -1;
+	var lastH:Int = -1;
+
+	public function new(spec:ThemeElementSpec)
+	{
+		this.spec = spec;
+		this._name = spec.name;
+		this.spr = new FlxSprite();
+		spr.antialiasing = true;
+	}
+
+	public function basic():FlxBasic
+		return spr;
+
+	public function addTo(state:FlxState):Void
+		state.add(spr);
+
+	public function update(ctx:Context):Void
+	{
+		final pos = Theme.parseXY(spec.pos, ctx.w, ctx.h);
+		final wh = Theme.parseWH(spec.size, ctx.w, ctx.h);
+
+		// Only redraw when size changes (or first time)
+		if (wh.w != lastW || wh.h != lastH || spr.pixels == null)
+		{
+			lastW = wh.w;
+			lastH = wh.h;
+			spr.loadGraphic(makeGlassBitmap(wh.w, wh.h));
+			spr.updateHitbox();
+		}
+		spr.x = pos.x;
+		spr.y = pos.y;
+
+		// Honor alpha param if present
+		if (spec.params != null && Reflect.hasField(spec.params, "alpha"))
+			spr.alpha = Theme.pFloat(spec.params, "alpha", 1.0);
+		else
+			spr.alpha = 1.0;
+
+		spr.visible = true;
+	}
+
+	function makeGlassBitmap(w:Int, h:Int):BitmapData
+	{
+		if (w <= 1 || h <= 1)
+			return new BitmapData(1, 1, true, 0x00000000);
+
+		// Params
+		var r = (spec.params != null
+			&& Reflect.hasField(spec.params, "cornerRadius")) ? Theme.pInt(spec.params, "cornerRadius", 18, 0, 256) : 18;
+
+		var gradTop = (spec.params != null
+			&& Reflect.hasField(spec.params,
+				"gradientTop")) ? FlxColor.fromString(Std.string(Reflect.field(spec.params, "gradientTop"))) : FlxColor.fromRGB(0x1A, 0x24, 0x48);
+		var gradBot = (spec.params != null
+			&& Reflect.hasField(spec.params,
+				"gradientBottom")) ? FlxColor.fromString(Std.string(Reflect.field(spec.params, "gradientBottom"))) : FlxColor.fromRGB(0x15, 0x1B, 0x34);
+
+		var strokeOuter = (spec.params != null
+			&& Reflect.hasField(spec.params,
+				"strokeOuter")) ? FlxColor.fromString(Std.string(Reflect.field(spec.params, "strokeOuter"))) : FlxColor.fromRGB(0x23, 0x37, 0x4D);
+		var strokeInner = (spec.params != null
+			&& Reflect.hasField(spec.params,
+				"strokeInner")) ? FlxColor.fromString(Std.string(Reflect.field(spec.params, "strokeInner"))) : FlxColor.fromRGB(0x5A, 0xA9, 0xFF);
+		var strokeInnerA = (spec.params != null
+			&& Reflect.hasField(spec.params, "strokeInnerAlpha")) ? Theme.pFloat(spec.params, "strokeInnerAlpha", 0.25) : 0.25;
+
+		// Optional corner clipping for header “top only”
+		var corners = (spec.params != null
+			&& Reflect.hasField(spec.params, "corners")) ? Std.string(Reflect.field(spec.params, "corners")) : "all";
+		var topOnly = (corners == "top");
+
+		// Draw with OpenFL Shape for nice rounded corners + gradient
+		var shape = new openfl.display.Shape();
+		var g = shape.graphics;
+
+		// Gradient fill
+		var m = new openfl.geom.Matrix();
+		m.createGradientBox(w, h, Math.PI / 2);
+
+		g.lineStyle(0, 0, 0);
+		g.beginGradientFill(openfl.display.GradientType.LINEAR, [gradTop, gradBot], [1, 1], [0, 255], m);
+
+		if (topOnly)
+			drawTopRoundedRect(g, 0, 0, w, h, r);
+		else
+			g.drawRoundRect(0, 0, w, h, r * 2, r * 2);
+
+		g.endFill();
+
+		// Outer stroke
+		g.lineStyle(1, strokeOuter, 1);
+		if (topOnly)
+			drawTopRoundedRect(g, 0, 0, w, h, r);
+		else
+			g.drawRoundRect(0, 0, w, h, r * 2, r * 2);
+
+		// Inner stroke (subtle)
+		g.lineStyle(1, strokeInner, strokeInnerA);
+		if (topOnly)
+			drawTopRoundedRect(g, 1, 1, w - 2, h - 2, Math.max(0, r - 1));
+		else
+			g.drawRoundRect(1, 1, w - 2, h - 2, Math.max(0, r - 1) * 2, Math.max(0, r - 1) * 2);
+
+		var bd = new BitmapData(w, h, true, 0x00000000);
+		var mtx = new openfl.geom.Matrix();
+		bd.draw(shape, mtx, null, null, null, true);
+		return bd;
+	}
+
+	inline function drawTopRoundedRect(g:openfl.display.Graphics, x:Float, y:Float, w:Float, h:Float, r:Float):Void
+	{
+		// Rounded on top-left/top-right, square on bottom
+		g.moveTo(x + r, y);
+		g.lineTo(x + w - r, y);
+		g.curveTo(x + w, y, x + w, y + r);
+		g.lineTo(x + w, y + h);
+		g.lineTo(x, y + h);
+		g.lineTo(x, y + r);
+		g.curveTo(x, y, x + r, y);
+	}
+}
+
+private class GenresNode implements IThemeNode
+{
+	public var name(get, never):String;
+	inline function get_name():String return _name;
+
+	var _name:String;
+	final el:ThemeElementSpec;
+	final theme:Theme;
+
+	var group:flixel.group.FlxGroup;
+	var boxes:Array<FlxSprite> = [];
+	var labels:Array<FlxText> = [];
+
+	// cached rect
+	var x0:Int = 0;
+	var y0:Int = 0;
+	var rw:Int = 0;
+	var rh:Int = 0;
+
+	// params
+	var chipW:Int = 96;
+	var chipH:Int = 96;
+	var gap:Int   = 16;
+	var align:String = "right"; // "left" | "right"
+
+	var fontName:String = null;
+	var pointSize:Int = 16;
+	var textColor:FlxColor = FlxColor.BLACK;
+
+	var boxColor:FlxColor = FlxColor.WHITE;
+	var strokeColor:FlxColor = FlxColor.BLACK;
+	var strokeWidth:Int = 4;
+	var innerStroke:Int = 2;
+	var labelOffsetY:Int = 72;
+
+	public function new(el:ThemeElementSpec, theme:Theme)
+	{
+		this.el = el;
+		this.theme = theme;
+		this._name = el.name;
+		this.group = new flixel.group.FlxGroup();
+
+		// read params
+		chipW = Theme.pInt(el.params, "chipW", chipW, 8, 4096);
+		chipH = Theme.pInt(el.params, "chipH", chipH, 8, 4096);
+		gap   = Theme.pInt(el.params, "gap", gap, 0, 4096);
+		align = (el.params != null && Reflect.hasField(el.params, "align")) ? Std.string(Reflect.field(el.params,"align")) : "right";
+
+		pointSize = Theme.pInt(el.params, "pointSize", pointSize, 6, 96);
+		textColor = (el.params != null && Reflect.hasField(el.params, "textColor")) ? FlxColor.fromString(Std.string(Reflect.field(el.params,"textColor"))) : FlxColor.BLACK;
+
+		boxColor = (el.params != null && Reflect.hasField(el.params, "boxColor")) ? FlxColor.fromString(Std.string(Reflect.field(el.params,"boxColor"))) : FlxColor.WHITE;
+		strokeColor = (el.params != null && Reflect.hasField(el.params, "strokeColor")) ? FlxColor.fromString(Std.string(Reflect.field(el.params,"strokeColor"))) : FlxColor.BLACK;
+		strokeWidth = Theme.pInt(el.params, "strokeWidth", strokeWidth, 0, 16);
+		innerStroke = Theme.pInt(el.params, "innerStroke", innerStroke, 0, 8);
+		labelOffsetY = Theme.pInt(el.params, "labelOffsetY", labelOffsetY, 0, chipH);
+
+		// Optional font
+		if (el.params != null && Reflect.hasField(el.params, "font"))
+		{
+			var rel = Std.string(Reflect.field(el.params, "font"));
+			if (rel != null && rel != "")
+			{
+				var abs = theme.resolve(rel);
+				#if sys
+				try {
+					var f = openfl.text.Font.fromFile(abs);
+					if (f != null) {
+						openfl.text.Font.registerFont(f);
+						fontName = f.fontName;
+					}
+				} catch (_:Dynamic) {}
+				#end
+			}
+		}
+	}
+
+	public function basic():FlxBasic return group;
+	public function addTo(state:FlxState):Void state.add(group);
+
+	public function update(ctx:Context):Void
+	{
+		// Update our rect from pos/size
+		var p = Theme.parseXY(el.pos, ctx.w, ctx.h);
+		var s = Theme.parseWH(el.size, ctx.w, ctx.h);
+		x0 = p.x; y0 = p.y; rw = s.w; rh = s.h;
+
+		// Collect genres via %GENRE1..N% using the existing resolver
+		var names = new Array<String>();
+		for (k in 1...20) // up to 19 genres; raise if needed
+		{
+			var v = ctx.resolveVar("GENRE" + k, 0);
+			if (v == null || v == "") break;
+			names.push(v);
+		}
+
+		layout(names);
+	}
+
+	function layout(genres:Array<String>):Void
+	{
+		// Ensure pool size
+		ensurePool(genres.length);
+
+		// Start horizontally inside our rect; align right by default
+		var startX = (align == "right")
+			? (x0 + rw - chipW)
+			: x0;
+
+		var yTop = y0 + Std.int((rh - chipH) * 0.5); // vertically centered inside our slot
+
+		for (i in 0...boxes.length)
+		{
+			var vis = (i < genres.length);
+			boxes[i].visible = vis;
+			labels[i].visible = vis;
+			if (!vis) continue;
+
+			var bx = (align == "right")
+				? startX - i * (chipW + gap)
+				: startX + i * (chipW + gap);
+			var by = yTop;
+
+			// draw/update box bitmap only if size changed
+			if (boxes[i].pixels == null || boxes[i].frameWidth != chipW || boxes[i].frameHeight != chipH)
+			{
+				boxes[i].loadGraphic(drawChip(chipW, chipH));
+				boxes[i].updateHitbox();
+			}
+			boxes[i].x = bx;
+			boxes[i].y = by;
+
+			labels[i].text = genres[i];
+			labels[i].setFormat(fontName, pointSize, textColor, "center");
+			labels[i].fieldWidth = chipW;
+			labels[i].x = bx;
+			labels[i].y = by + labelOffsetY;
+		}
+	}
+
+	function ensurePool(n:Int):Void
+	{
+		// grow
+		while (boxes.length < n)
+		{
+			var b = new FlxSprite();
+			b.antialiasing = true;
+			group.add(b);
+			boxes.push(b);
+
+			var t = new FlxText();
+			t.wordWrap = true;
+			group.add(t);
+			labels.push(t);
+		}
+
+		// shrink (hide extras)
+		for (i in n...boxes.length)
+		{
+			boxes[i].visible = false;
+			labels[i].visible = false;
+		}
+	}
+
+	function drawChip(w:Int, h:Int):BitmapData
+	{
+		var shape = new openfl.display.Shape();
+		var g = shape.graphics;
+
+		// outer stroke
+		if (strokeWidth > 0)
+		{
+			g.lineStyle(strokeWidth, strokeColor, 1);
+		}
+		else
+		{
+			g.lineStyle(0, 0, 0);
+		}
+
+		// rounded rect fill
+		var r = Math.round(Math.min(w, h) * 0.15);
+		g.beginFill(boxColor, 1);
+		g.drawRoundRect(0, 0, w, h, r*2, r*2);
+		g.endFill();
+
+		// inner stroke
+		if (innerStroke > 0)
+		{
+			g.lineStyle(innerStroke, 0x000000, 0.25);
+			g.drawRoundRect(1, 1, w-2, h-2, Math.max(0,r-1)*2, Math.max(0,r-1)*2);
+		}
+
+		var bd = new BitmapData(w, h, true, 0x00000000);
+		bd.draw(shape, new openfl.geom.Matrix(), null, null, null, true);
+		return bd;
 	}
 }
