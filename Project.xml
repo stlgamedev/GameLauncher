@@ -9,7 +9,7 @@
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
 
-	<set name="BUILD_DIR" value="export8" />
+	<set name="BUILD_DIR" value="C:\ProjectBuilds\STLGameLauncher" />
 
 
 	<source path="source" />
@@ -20,8 +20,6 @@
 
 	<haxelib name="openfl-aseprite" />
 	<haxelib name="hxCodec" />
-	<haxelib name="haxeui-core" />
-	<haxelib name="haxeui-flixel" />
 
 
 	<haxedef name="FLX_NO_HEALTH" />

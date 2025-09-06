@@ -4,7 +4,7 @@ import haxe.io.Path;
 import sys.FileSystem;
 
 class Paths {
-	/** Root for content (games/trailers/themes). Falls back to "external". */
+	/** Root for content (games/trailers/theme). Falls back to "external". */
 	public static function contentRoot():String
 	{
 		var root = (Globals.cfg != null && Globals.cfg.contentRootDir != null && Globals.cfg.contentRootDir != "") ? Globals.cfg.contentRootDir : "external";
@@ -25,8 +25,8 @@ class Paths {
 	public static inline function trailersDir():String
 		return Path.join([contentRoot(), "trailers"]);
 
-	public static inline function themesDir():String
-		return Path.join([contentRoot(), "themes"]);
+	public static inline function themeDir():String
+		return Path.join([contentRoot(), "theme"]);
 
 	/** Create logs dir (safe once cfg exists). */
 	public static function ensureLogs():Void
@@ -40,7 +40,7 @@ class Paths {
 		ensureDir(contentRoot());
 		ensureDir(gamesDir());
 		ensureDir(trailersDir());
-		ensureDir(themesDir());
+		ensureDir(themeDir());
 	}
 
 	// ---- helpers ----
@@ -50,7 +50,7 @@ class Paths {
 		return (p == null || p == "") ? "" : Path.normalize(p);
 	}
 
-	static function ensureDir(p:String):Void
+	public static function ensureDir(p:String):Void
 	{
 		if (p == null || p == "")
 			return;

@@ -70,13 +70,20 @@ class BootState extends FlxState
 				Globals.log = new util.Logger();
 				Log.line("=== Launcher started ===");
 				stepDone("Logs");
-
 			case 1:
 				// Config
-				Globals.cfg = Config.loadOrCreate();
+				Globals.cfg = util.Config.loadOrCreate();
 				util.InputMap.inst.configure(Globals.cfg.controlsKeys, Globals.cfg.controlsPads);
+				Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir + ", subscription=" + Globals.cfg.subscription);
 
-				Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir + ", theme=" + Globals.cfg.theme);
+				// >>> Add this early exit for auto-update <<<
+				if (Globals.cfg.updateOnLaunch)
+				{
+					Log.line("[BOOT] update_on_launch=true -> switching to UpdateState");
+					FlxG.switchState(() -> new UpdateState());
+					return; // IMPORTANT: stop the boot pipeline; UpdateState will come back to BootState
+				}
+
 				stepDone("Config");
 
 			case 2:
@@ -98,7 +105,7 @@ class BootState extends FlxState
 
 			case 4:
 				// Load theme
-				final themeDir = HxPath.join([Paths.themesDir(), Globals.cfg.theme]);
+				final themeDir = Paths.themeDir();
 				Globals.theme = themes.Theme.load(themeDir);
 				Globals.theme.preloadAssets();
 				Globals.theme.preloadFonts();

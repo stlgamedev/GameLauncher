@@ -8,13 +8,19 @@ class Main extends Sprite
 
 		super();
 
-		#if haxeui_flixel
-		if (!haxe.ui.Toolkit.initialized) {
-			haxe.ui.Toolkit.init();
-		}
+		var wantUpdate = false;
+		#if sys
+		for (a in Sys.args())
+			if (a == "--update")
+			{
+				wantUpdate = true;
+				break;
+			}
 		#end
 
-		addChild(new flixel.FlxGame(1920, 1080, () -> new BootState(), 60, 60, true));
+		var initState:Class<FlxState> = if (wantUpdate) UpdateState else BootState;
+
+		addChild(new flixel.FlxGame(1920, 1080, initState, 60, 60, true));
 	}
 }
 
