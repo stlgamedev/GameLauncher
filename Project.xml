@@ -9,11 +9,12 @@
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
 
-	<set name="BUILD_DIR" value="C:\ProjectBuilds\STLGameLauncher" />
+	<set name="BUILD_DIR" value="export10" if="debug" unless="release" />
+	<set name="BUILD_DIR" value="C:\\Builds\\STLGameLauncher" if="release" unless="debug" />
 
 
 	<source path="source" />
-	<assets path="assets" />
+	<assets path="assets" embed="true" />
 
 
 	<haxelib name="flixel" />

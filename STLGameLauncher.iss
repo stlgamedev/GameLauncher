@@ -1,32 +1,21 @@
-; ============================================================
-; STLGameLauncher - Inno Setup Script
-; - Reads app version from built EXE
-; - Installs launcher to {app}
-; - Writes settings.cfg (if missing) using simple wizard inputs
-; - Adds a "Check for Updates" shortcut that runs the launcher with --update
-; - Copies build output from a fixed folder
-; ============================================================
 
-#define BuildRoot  "C:\ProjectBuilds\STLGameLauncher\windows\bin"
-#define AppExe     BuildRoot + "\STLGameLauncher.exe"
-#define VerFull    GetFileVersion(AppExe)                 ; e.g. "1.0.0.0"
-#define VerShort   Copy(VerFull, 1, RPos(".", VerFull)-1) ; e.g. "1.0.0"
-#define VerUnd     StringChange(VerShort, ".", "_")       ; e.g. "1_0_0"
+#define VERSION "0.1.0"
+#define BuildRoot "C:\Builds\STLGameLauncher\windows\bin"
 
 [Setup]
 AppId=STLGameLauncher
 AppName=STLGameLauncher
-AppVersion={#VerShort}
+AppVersion={#VERSION}
 AppPublisher=STLGameDev
 DefaultDirName={autopf}\STLGameLauncher
 DefaultGroupName=STLGameLauncher
 OutputDir=.
-OutputBaseFilename=STLGameLauncher-Setup-v{#VerUnd}
+OutputBaseFilename=STLGameLauncher-Setup-v{#StringChange(VERSION, ".", "_")}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-DisableProgramGroupPage=yes
 ArchitecturesInstallIn64BitMode=x64
+MinVersion=10.0.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -45,282 +34,120 @@ Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "A
 [Run]
 Filename: "{app}\STLGameLauncher.exe"; Description: "Launch STLGameLauncher"; Flags: nowait postinstall skipifsilent
 
-; ----------------------- Custom Wizard Pages -----------------------
 [Code]
 var
-  PageGeneral: TWizardPage;
-  PagePaths: TWizardPage;
-  PageUpdate: TWizardPage;
-  PageServer: TWizardPage;
-
+  PageOptions, PagePaths, PageUpdate: TWizardPage;
   RadioModeNormal, RadioModeKiosk: TRadioButton;
-  EditSubscription: TEdit;
-
-  EditContentRoot, EditLogsRoot: TEdit;
-  BtnContentBrowse, BtnLogsBrowse: TButton;
-
   EditIdleMenu, EditIdleGame: TEdit;
-
+  EditContentRoot, EditLogsRoot: TEdit;
   CheckUpdateOnLaunch: TCheckBox;
-
-  EditServerBase: TEdit;
-
-function DirBrowse(const Prompt: string; const Initial: string): string;
-begin
-  Result := '';
-  if BrowseForFolder(WizardForm.Handle, Prompt, Initial, Result) then
-  begin
-    // nothing
-  end;
-end;
+  EditServerBase, EditSubscription: TEdit;
 
 procedure InitializeWizard;
-var
-  L: TNewStaticText;
 begin
-  { General page }
-  PageGeneral := CreateCustomPage(wpSelectTasks, 'General', 'Basic launcher options');
-
-  L := TNewStaticText.Create(PageGeneral);
-  L.Parent := PageGeneral.Surface;
-  L.Caption := 'Mode:';
-  L.Left := ScaleX(0);
-  L.Top := ScaleY(8);
-
-  RadioModeNormal := TRadioButton.Create(PageGeneral);
-  RadioModeNormal.Parent := PageGeneral.Surface;
-  RadioModeNormal.Caption := 'normal';
-  RadioModeNormal.Left := ScaleX(80);
-  RadioModeNormal.Top := ScaleY(6);
+  // --- Options Page ---
+  PageOptions := CreateCustomPage(wpSelectDir, 'Launcher Options', 'Set launcher mode and idle times');
+  RadioModeNormal := TRadioButton.Create(PageOptions);
+  RadioModeNormal.Parent := PageOptions.Surface;
+  RadioModeNormal.Caption := 'Normal mode';
   RadioModeNormal.Checked := True;
+  RadioModeNormal.Top := 8;
+  RadioModeNormal.Left := 0;
 
-  RadioModeKiosk := TRadioButton.Create(PageGeneral);
-  RadioModeKiosk.Parent := PageGeneral.Surface;
-  RadioModeKiosk.Caption := 'kiosk';
-  RadioModeKiosk.Left := ScaleX(160);
-  RadioModeKiosk.Top := ScaleY(6);
+  RadioModeKiosk := TRadioButton.Create(PageOptions);
+  RadioModeKiosk.Parent := PageOptions.Surface;
+  RadioModeKiosk.Caption := 'Kiosk mode';
+  RadioModeKiosk.Top := 32;
+  RadioModeKiosk.Left := 0;
 
-  L := TNewStaticText.Create(PageGeneral);
-  L.Parent := PageGeneral.Surface;
-  L.Caption := 'Subscription (e.g., arcade-jam-2018):';
-  L.Left := ScaleX(0);
-  L.Top := ScaleY(36);
-
-  EditSubscription := TEdit.Create(PageGeneral);
-  EditSubscription.Parent := PageGeneral.Surface;
-  EditSubscription.Left := ScaleX(0);
-  EditSubscription.Top := ScaleY(54);
-  EditSubscription.Width := ScaleX(320);
-  EditSubscription.Text := 'default';
-
-  L := TNewStaticText.Create(PageGeneral);
-  L.Parent := PageGeneral.Surface;
-  L.Caption := 'Idle (seconds) — Menu / Game:';
-  L.Left := ScaleX(0);
-  L.Top := ScaleY(88);
-
-  EditIdleMenu := TEdit.Create(PageGeneral);
-  EditIdleMenu.Parent := PageGeneral.Surface;
-  EditIdleMenu.Left := ScaleX(0);
-  EditIdleMenu.Top := ScaleY(106);
-  EditIdleMenu.Width := ScaleX(70);
+  EditIdleMenu := TEdit.Create(PageOptions);
+  EditIdleMenu.Parent := PageOptions.Surface;
+  EditIdleMenu.Top := 64;
+  EditIdleMenu.Left := 0;
+  EditIdleMenu.Width := 60;
   EditIdleMenu.Text := '180';
 
-  EditIdleGame := TEdit.Create(PageGeneral);
-  EditIdleGame.Parent := PageGeneral.Surface;
-  EditIdleGame.Left := ScaleX(80);
-  EditIdleGame.Top := ScaleY(106);
-  EditIdleGame.Width := ScaleX(70);
+  EditIdleGame := TEdit.Create(PageOptions);
+  EditIdleGame.Parent := PageOptions.Surface;
+  EditIdleGame.Top := 64;
+  EditIdleGame.Left := 80;
+  EditIdleGame.Width := 60;
   EditIdleGame.Text := '300';
 
-  { Paths page }
-  PagePaths := CreateCustomPage(PageGeneral.ID, 'Paths', 'Where content and logs live');
-
-  L := TNewStaticText.Create(PagePaths);
-  L.Parent := PagePaths.Surface;
-  L.Caption := 'Content root (contains games/, trailers/, themes/):';
-  L.Left := ScaleX(0);
-  L.Top := ScaleY(8);
-
+  // --- Paths Page ---
+  PagePaths := CreateCustomPage(PageOptions.ID, 'Paths', 'Where content and logs live');
   EditContentRoot := TEdit.Create(PagePaths);
   EditContentRoot.Parent := PagePaths.Surface;
-  EditContentRoot.Left := ScaleX(0);
-  EditContentRoot.Top := ScaleY(26);
-  EditContentRoot.Width := ScaleX(360);
-  EditContentRoot.Text := ExpandConstant('{commonappdata}\STLGameLauncher\external');
-
-  BtnContentBrowse := TButton.Create(PagePaths);
-  BtnContentBrowse.Parent := PagePaths.Surface;
-  BtnContentBrowse.Left := EditContentRoot.Left + EditContentRoot.Width + ScaleX(8);
-  BtnContentBrowse.Top := EditContentRoot.Top;
-  BtnContentBrowse.Caption := 'Browse...';
-  BtnContentBrowse.OnClick := @OnBrowseContent;
-
-  L := TNewStaticText.Create(PagePaths);
-  L.Parent := PagePaths.Surface;
-  L.Caption := 'Logs root:';
-  L.Left := ScaleX(0);
-  L.Top := ScaleY(64);
+  EditContentRoot.Top := 8;
+  EditContentRoot.Left := 0;
+  EditContentRoot.Width := 300;
+  EditContentRoot.Text := ExpandConstant('{commonappdata}\\STLGameLauncher\\external');
 
   EditLogsRoot := TEdit.Create(PagePaths);
   EditLogsRoot.Parent := PagePaths.Surface;
-  EditLogsRoot.Left := ScaleX(0);
-  EditLogsRoot.Top := ScaleY(82);
-  EditLogsRoot.Width := ScaleX(360);
-  EditLogsRoot.Text := ExpandConstant('{commonappdata}\STLGameLauncher\logs');
+  EditLogsRoot.Top := 40;
+  EditLogsRoot.Left := 0;
+  EditLogsRoot.Width := 300;
+  EditLogsRoot.Text := ExpandConstant('{commonappdata}\\STLGameLauncher\\logs');
 
-  BtnLogsBrowse := TButton.Create(PagePaths);
-  BtnLogsBrowse.Parent := PagePaths.Surface;
-  BtnLogsBrowse.Left := EditLogsRoot.Left + EditLogsRoot.Width + ScaleX(8);
-  BtnLogsBrowse.Top := EditLogsRoot.Top;
-  BtnLogsBrowse.Caption := 'Browse...';
-  BtnLogsBrowse.OnClick := @OnBrowseLogs;
-
-  { Update page }
-  PageUpdate := CreateCustomPage(PagePaths.ID, 'Updates', 'Update behavior');
-
+  // --- Update/Server Page ---
+  PageUpdate := CreateCustomPage(PagePaths.ID, 'Update & Server', 'Update and server settings');
   CheckUpdateOnLaunch := TCheckBox.Create(PageUpdate);
   CheckUpdateOnLaunch.Parent := PageUpdate.Surface;
-  CheckUpdateOnLaunch.Left := ScaleX(0);
-  CheckUpdateOnLaunch.Top := ScaleY(8);
-  CheckUpdateOnLaunch.Caption := 'Check for updates on application launch';
-  CheckUpdateOnLaunch.Checked := False;
+  CheckUpdateOnLaunch.Top := 8;
+  CheckUpdateOnLaunch.Left := 0;
+  CheckUpdateOnLaunch.Width := 300;
+  CheckUpdateOnLaunch.Caption := 'Check for updates when the application launches';
+  CheckUpdateOnLaunch.Checked := True;
 
-  { Server page }
-  PageServer := CreateCustomPage(PageUpdate.ID, 'Server', 'Server base URL');
+  EditSubscription := TEdit.Create(PageUpdate);
+  EditSubscription.Parent := PageUpdate.Surface;
+  EditSubscription.Top := 40;
+  EditSubscription.Left := 0;
+  EditSubscription.Width := 300;
+  EditSubscription.Text := 'arcade-jam-2018';
 
-  L := TNewStaticText.Create(PageServer);
-  L.Parent := PageServer.Surface;
-  L.Caption := 'Server base (contains per-subscription folders):';
-  L.Left := ScaleX(0);
-  L.Top := ScaleY(8);
-
-  EditServerBase := TEdit.Create(PageServer);
-  EditServerBase.Parent := PageServer.Surface;
-  EditServerBase.Left := ScaleX(0);
-  EditServerBase.Top := ScaleY(26);
-  EditServerBase.Width := ScaleX(420);
+  EditServerBase := TEdit.Create(PageUpdate);
+  EditServerBase.Parent := PageUpdate.Surface;
+  EditServerBase.Top := 72;
+  EditServerBase.Left := 0;
+  EditServerBase.Width := 300;
   EditServerBase.Text := 'https://sgd.axolstudio.com/';
-end;
-
-procedure OnBrowseContent(Sender: TObject);
-var S: string;
-begin
-  S := DirBrowse('Select content root (with games/, trailers/, themes/)', EditContentRoot.Text);
-  if S <> '' then EditContentRoot.Text := S;
-end;
-
-procedure OnBrowseLogs(Sender: TObject);
-var S: string;
-begin
-  S := DirBrowse('Select logs root', EditLogsRoot.Text);
-  if S <> '' then EditLogsRoot.Text := S;
-end;
-
-function StrTrim(const S: string): string;
-begin
-  Result := Trim(S);
-end;
-
-function BoolStr(B: Boolean): string;
-begin
-  if B then Result := 'true' else Result := 'false';
-end;
-
-function BuildIni(
-  const Mode, Subscription, ContentRoot, LogsRoot, IdleMenu, IdleGame,
-  UpdateOnLaunch, ServerBase: string;
-  const KeysPrev, KeysNext, KeysSelect, KeysBack, KeysAdmin: string;
-  const PadsPrev, PadsNext, PadsSelect, PadsBack, PadsAdmin: string
-): string;
-var
-  S: string;
-begin
-  S :=
-    '; ==========================================================='#13#10 +
-    '; STLGameLauncher Settings'#13#10 +
-    '; (generated by installer)'#13#10 +
-    '; ==========================================================='#13#10#13#10 +
-
-    '[General]'#13#10 +
-    'mode = ' + Mode + #13#10 +
-    'subscription = ' + Subscription + #13#10 +
-    'idle_seconds_menu = ' + IdleMenu + #13#10 +
-    'idle_seconds_game = ' + IdleGame + #13#10#13#10 +
-
-    '[Paths]'#13#10 +
-    'content_root = ' + ContentRoot + #13#10 +
-    'logs_root = ' + LogsRoot + #13#10#13#10 +
-
-    '[Update]'#13#10 +
-    'update_on_launch = ' + UpdateOnLaunch + #13#10 +
-    'server_base = ' + ServerBase + #13#10#13#10 +
-
-    '[Controls.Keys]'#13#10 +
-    'prev = ' + KeysPrev + #13#10 +
-    'next = ' + KeysNext + #13#10 +
-    'select = ' + KeysSelect + #13#10 +
-    'back = ' + KeysBack + #13#10 +
-    'admin_exit = ' + KeysAdmin + #13#10#13#10 +
-
-    '[Controls.Pads]'#13#10 +
-    'prev = ' + PadsPrev + #13#10 +
-    'next = ' + PadsNext + #13#10 +
-    'select = ' + PadsSelect + #13#10 +
-    'back = ' + PadsBack + #13#10 +
-    'admin_exit = ' + PadsAdmin + #13#10;
-
-  Result := S;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  IniPath: string;
-  Mode, Subscription, ContentRoot, LogsRoot: string;
-  IdleMenu, IdleGame: string;
-  UpdateOnLaunch, ServerBase: string;
-  IniText: string;
+  IniPath, Mode, Subscription, ContentRoot, LogsRoot, IdleMenu, IdleGame, UpdateOnLaunch, ServerBase, IniText: string;
 begin
-  if CurStep = ssInstall then
+  if CurStep = ssPostInstall then
   begin
-    IniPath := ExpandConstant('{app}\settings.cfg');
+    IniPath := ExpandConstant('{app}\\settings.cfg');
+    if RadioModeKiosk.Checked then Mode := 'kiosk' else Mode := 'normal';
+    Subscription := Trim(EditSubscription.Text);
+    if Subscription = '' then Subscription := 'arcade-jam-2018';
+    ContentRoot := Trim(EditContentRoot.Text);
+    if ContentRoot = '' then ContentRoot := ExpandConstant('{commonappdata}\\STLGameLauncher\\external');
+    LogsRoot := Trim(EditLogsRoot.Text);
+    if LogsRoot = '' then LogsRoot := ExpandConstant('{commonappdata}\\STLGameLauncher\\logs');
+    IdleMenu := Trim(EditIdleMenu.Text); if IdleMenu = '' then IdleMenu := '180';
+    IdleGame := Trim(EditIdleGame.Text); if IdleGame = '' then IdleGame := '300';
+    UpdateOnLaunch := IfThen(CheckUpdateOnLaunch.Checked, 'true', 'false');
+    ServerBase := Trim(EditServerBase.Text);
+    if ServerBase = '' then ServerBase := 'https://sgd.axolstudio.com/';
 
-    if not FileExists(IniPath) then
-    begin
-      // Collect values
-      if RadioModeKiosk.Checked then Mode := 'kiosk' else Mode := 'normal';
-      Subscription := StrTrim(EditSubscription.Text);
+    IniText :=
+      '[General]'#13#10 +
+      'mode = ' + Mode + #13#10 +
+      'subscription = ' + Subscription + #13#10 +
+      'idle_seconds_menu = ' + IdleMenu + #13#10 +
+      'idle_seconds_game = ' + IdleGame + #13#10#13#10 +
+      '[Paths]'#13#10 +
+      'content_root = ' + ContentRoot + #13#10 +
+      'logs_root = ' + LogsRoot + #13#10#13#10 +
+      '[Update]'#13#10 +
+      'update_on_launch = ' + UpdateOnLaunch + #13#10 +
+      'server_base = ' + ServerBase + #13#10;
 
-      ContentRoot := StrTrim(EditContentRoot.Text);
-      if ContentRoot = '' then ContentRoot := ExpandConstant('{commonappdata}\STLGameLauncher\external');
-
-      LogsRoot := StrTrim(EditLogsRoot.Text);
-      if LogsRoot = '' then LogsRoot := ExpandConstant('{commonappdata}\STLGameLauncher\logs');
-
-      IdleMenu := StrTrim(EditIdleMenu.Text);
-      if IdleMenu = '' then IdleMenu := '180';
-      IdleGame := StrTrim(EditIdleGame.Text);
-      if IdleGame = '' then IdleGame := '300';
-
-      UpdateOnLaunch := BoolStr(CheckUpdateOnLaunch.Checked);
-
-      ServerBase := StrTrim(EditServerBase.Text);
-      if ServerBase = '' then ServerBase := 'https://sgd.axolstudio.com/';
-
-      // Default control mappings (match Config defaults; admin can edit later)
-      IniText := BuildIni(
-        Mode, Subscription, ContentRoot, LogsRoot, IdleMenu, IdleGame,
-        UpdateOnLaunch, ServerBase,
-        'left, a', 'right, d', 'enter, space, comma, slash', 'escape', 'shift+f12',
-        'pad_left', 'pad_right', 'pad_a, pad_start', 'pad_select', ''
-      );
-
-      if SaveStringToFile(IniPath, IniText, False) then
-      begin
-        // also ensure content/logs dirs exist
-        if not DirExists(ContentRoot) then ForceDirectories(ContentRoot);
-        if not DirExists(LogsRoot) then ForceDirectories(LogsRoot);
-      end;
-    end;
+    SaveStringToFile(IniPath, IniText, False);
   end;
 end;

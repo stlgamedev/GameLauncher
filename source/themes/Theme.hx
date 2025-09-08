@@ -2,6 +2,7 @@ package themes;
 
 
 
+import flixel.graphics.frames.FlxAtlasFrames;
 using StringTools;
 
 /* ---------------- Spec ---------------- */
@@ -1148,8 +1149,7 @@ private class GenresNode implements IThemeNode
 	final theme:Theme;
 
 	var group:flixel.group.FlxGroup;
-	var boxes:Array<FlxSprite> = [];
-	var labels:Array<FlxText> = [];
+	var icons:Array<FlxSprite> = [];
 
 	// cached rect
 	var x0:Int = 0;
@@ -1163,15 +1163,8 @@ private class GenresNode implements IThemeNode
 	var gap:Int   = 16;
 	var align:String = "right"; // "left" | "right"
 
-	var fontName:String = null;
-	var pointSize:Int = 16;
-	var textColor:FlxColor = FlxColor.BLACK;
-
-	var boxColor:FlxColor = FlxColor.WHITE;
-	var strokeColor:FlxColor = FlxColor.BLACK;
-	var strokeWidth:Int = 4;
-	var innerStroke:Int = 2;
-	var labelOffsetY:Int = 72;
+	// static genre atlas
+	static var genreFrames:FlxAtlasFrames = null;
 
 	public function new(el:ThemeElementSpec, theme:Theme)
 	{
@@ -1182,36 +1175,13 @@ private class GenresNode implements IThemeNode
 
 		// read params
 		chipW = Theme.pInt(el.params, "chipW", chipW, 8, 4096);
-		chipH = Theme.pInt(el.params, "chipH", chipH, 8, 4096);
+		chipH = Theme.pInt(el.params, "chipH",  chipH, 8, 4096);
 		gap   = Theme.pInt(el.params, "gap", gap, 0, 4096);
 		align = (el.params != null && Reflect.hasField(el.params, "align")) ? Std.string(Reflect.field(el.params,"align")) : "right";
 
-		pointSize = Theme.pInt(el.params, "pointSize", pointSize, 6, 96);
-		textColor = (el.params != null && Reflect.hasField(el.params, "textColor")) ? FlxColor.fromString(Std.string(Reflect.field(el.params,"textColor"))) : FlxColor.BLACK;
-
-		boxColor = (el.params != null && Reflect.hasField(el.params, "boxColor")) ? FlxColor.fromString(Std.string(Reflect.field(el.params,"boxColor"))) : FlxColor.WHITE;
-		strokeColor = (el.params != null && Reflect.hasField(el.params, "strokeColor")) ? FlxColor.fromString(Std.string(Reflect.field(el.params,"strokeColor"))) : FlxColor.BLACK;
-		strokeWidth = Theme.pInt(el.params, "strokeWidth", strokeWidth, 0, 16);
-		innerStroke = Theme.pInt(el.params, "innerStroke", innerStroke, 0, 8);
-		labelOffsetY = Theme.pInt(el.params, "labelOffsetY", labelOffsetY, 0, chipH);
-
-		// Optional font
-		if (el.params != null && Reflect.hasField(el.params, "font"))
-		{
-			var rel = Std.string(Reflect.field(el.params, "font"));
-			if (rel != null && rel != "")
-			{
-				var abs = theme.resolve(rel);
-				#if sys
-				try {
-					var f = openfl.text.Font.fromFile(abs);
-					if (f != null) {
-						openfl.text.Font.registerFont(f);
-						fontName = f.fontName;
-					}
-				} catch (_:Dynamic) {}
-				#end
-			}
+		// Load genre atlas once
+		if (genreFrames == null) {
+			genreFrames = FlxAtlasFrames.fromSparrow("assets/images/genres.png", "assets/images/genres.xml");
 		}
 	}
 
@@ -1249,11 +1219,10 @@ private class GenresNode implements IThemeNode
 
 		var yTop = y0 + Std.int((rh - chipH) * 0.5); // vertically centered inside our slot
 
-		for (i in 0...boxes.length)
+		for (i in 0...icons.length)
 		{
 			var vis = (i < genres.length);
-			boxes[i].visible = vis;
-			labels[i].visible = vis;
+			icons[i].visible = vis;
 			if (!vis) continue;
 
 			var bx = (align == "right")
@@ -1261,77 +1230,35 @@ private class GenresNode implements IThemeNode
 				: startX + i * (chipW + gap);
 			var by = yTop;
 
-			// draw/update box bitmap only if size changed
-			if (boxes[i].pixels == null || boxes[i].frameWidth != chipW || boxes[i].frameHeight != chipH)
-			{
-				boxes[i].loadGraphic(drawChip(chipW, chipH));
-				boxes[i].updateHitbox();
+			// Set genre icon from atlas
+			var frameName = genres[i].toLowerCase();
+			if (genreFrames != null && genreFrames.exists(frameName)) {
+				icons[i].frames = genreFrames;
+				icons[i].animation.frameName = frameName;
+				icons[i].setGraphicSize(chipW, chipH);
+			} else {
+				icons[i].makeGraphic(chipW, chipH, FlxColor.TRANSPARENT);
 			}
-			boxes[i].x = bx;
-			boxes[i].y = by;
-
-			labels[i].text = genres[i];
-			labels[i].setFormat(fontName, pointSize, textColor, "center");
-			labels[i].fieldWidth = chipW;
-			labels[i].x = bx;
-			labels[i].y = by + labelOffsetY;
+			icons[i].x = bx;
+			icons[i].y = by;
 		}
 	}
 
 	function ensurePool(n:Int):Void
 	{
 		// grow
-		while (boxes.length < n)
+		while (icons.length < n)
 		{
 			var b = new FlxSprite();
 			b.antialiasing = true;
 			group.add(b);
-			boxes.push(b);
-
-			var t = new FlxText();
-			t.wordWrap = true;
-			group.add(t);
-			labels.push(t);
+			icons.push(b);
 		}
 
 		// shrink (hide extras)
-		for (i in n...boxes.length)
+		for (i in n...icons.length)
 		{
-			boxes[i].visible = false;
-			labels[i].visible = false;
+			icons[i].visible = false;
 		}
-	}
-
-	function drawChip(w:Int, h:Int):BitmapData
-	{
-		var shape = new openfl.display.Shape();
-		var g = shape.graphics;
-
-		// outer stroke
-		if (strokeWidth > 0)
-		{
-			g.lineStyle(strokeWidth, strokeColor, 1);
-		}
-		else
-		{
-			g.lineStyle(0, 0, 0);
-		}
-
-		// rounded rect fill
-		var r = Math.round(Math.min(w, h) * 0.15);
-		g.beginFill(boxColor, 1);
-		g.drawRoundRect(0, 0, w, h, r*2, r*2);
-		g.endFill();
-
-		// inner stroke
-		if (innerStroke > 0)
-		{
-			g.lineStyle(innerStroke, 0x000000, 0.25);
-			g.drawRoundRect(1, 1, w-2, h-2, Math.max(0,r-1)*2, Math.max(0,r-1)*2);
-		}
-
-		var bd = new BitmapData(w, h, true, 0x00000000);
-		bd.draw(shape, new openfl.geom.Matrix(), null, null, null, true);
-		return bd;
 	}
 }

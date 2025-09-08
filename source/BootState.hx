@@ -1,10 +1,15 @@
-package;
-
 #if sys
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
 #end
+import util.UpdateSubState;
+
+typedef UpdateNeeded =
+{
+	app:Bool,
+	content:Bool
+};
 
 class BootState extends FlxState
 {
@@ -72,16 +77,25 @@ class BootState extends FlxState
 				stepDone("Logs");
 			case 1:
 				// Config
-				Globals.cfg = util.Config.loadOrCreate();
+				Globals.cfg = util.Config.load();
+				if (Globals.cfg == null)
+				{
+					Log.line("[BOOT] No config found, created default.");
+					Sys.exit(1);
+				}
 				util.InputMap.inst.configure(Globals.cfg.controlsKeys, Globals.cfg.controlsPads);
 				Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir + ", subscription=" + Globals.cfg.subscription);
 
-				// >>> Add this early exit for auto-update <<<
+				// >>> App update check first, only check content if no app update <<<
+
 				if (Globals.cfg.updateOnLaunch)
 				{
-					Log.line("[BOOT] update_on_launch=true -> switching to UpdateState");
-					FlxG.switchState(() -> new UpdateState());
-					return; // IMPORTANT: stop the boot pipeline; UpdateState will come back to BootState
+					Log.line("[BOOT] update_on_launch=true -> checking for updates via UpdateSubState");
+					openSubState(new util.UpdateSubState(util.UpdateMode.AppUpdateOrContent(Globals.cfg.subscription), function()
+					{
+						stepDone("Config");
+					}));
+					return;
 				}
 
 				stepDone("Config");

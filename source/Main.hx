@@ -18,7 +18,7 @@ class Main extends Sprite
 			}
 		#end
 
-		var initState:Class<FlxState> = if (wantUpdate) UpdateState else BootState;
+		var initState:Class<flixel.FlxState> = wantUpdate ? UpdateOnlyState : BootState;
 
 		addChild(new flixel.FlxGame(1920, 1080, initState, 60, 60, true));
 	}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TextureAtlas imagePath="rpg-sprites.png">
+	<!--
+	Created with ShoeBox
+	http://renderhjs.net/shoebox/
+	-->
+	<SubTexture name="action" x="92" y="117" width="90" height="115" frameX="-0" frameY="-0"
+		frameWidth="90" frameHeight="115" />
+	<SubTexture name="puzzle" x="0" y="0" width="90" height="115" frameX="-0" frameY="-0"
+		frameWidth="90" frameHeight="115" />
+	<SubTexture name="rpg" x="0" y="117" width="90" height="115" frameX="-0" frameY="-0"
+		frameWidth="90" frameHeight="115" />
+	<SubTexture name="visual-novel" x="92" y="0" width="90" height="115" frameX="-0" frameY="-0"
+		frameWidth="90" frameHeight="115" />
+</TextureAtlas>

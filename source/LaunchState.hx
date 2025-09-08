@@ -10,13 +10,20 @@ import openfl.display.BitmapData;
 import sys.FileSystem;
 import sys.io.Process;
 import sys.thread.Thread;
+import util.InputMap.Action;
+
+// Include WinAPI headers when compiling for Windows C++
+#if (windows && cpp)
+import cpp.NativeArray;
+@:cppFileCode('#include <Windows.h>\n#include <Xinput.h>')
+#end
 
 class LaunchState extends FlxState
 {
 	public var game:util.GameEntry;
 
 	var splash:flixel.FlxSprite; // centered box art (fit)
-	var logo:Aseprite; // spinner shown in BR corner (same as BootState)
+	var logo:Aseprite;           // spinner shown in BR corner (same as BootState)
 
 	var proc:Process = null;
 	var procExited:Bool = false;
@@ -29,8 +36,9 @@ class LaunchState extends FlxState
 	var startTimeMs:Float = Date.now().getTime();
 
 	// Optional XInput dynamic
-	#if cpp
-	var XInputGetState:Dynamic = null;
+	#if (windows && cpp)
+	var XInputGetState:Dynamic = null; // loaded at runtime if available
+	var lastPadHash:Int = 0;
 	#end
 
 	public function new(g:util.GameEntry)
@@ -49,29 +57,24 @@ class LaunchState extends FlxState
 		var boxPath = game.box;
 		if (boxPath != null && FileSystem.exists(boxPath))
 		{
-			try
-			{
+			try {
 				var bd = BitmapData.fromFile(boxPath);
 				splash.loadGraphic(bd);
-			}
-			catch (_:Dynamic) {}
+			} catch (_:Dynamic) {}
 		}
 		splash.antialiasing = true;
 		add(splash);
 		resizeSplash();
 
 		// --- Spinner (same asset/placement as BootState) ---
-		try
-		{
+		try {
 			var bytes = Assets.getBytes("assets/images/spinning_icon.aseprite");
 			logo = Aseprite.fromBytes(bytes);
 			logo.play();
 			logo.mouseEnabled = logo.mouseChildren = false;
 			FlxG.stage.addChild(logo);
 			fitOpenFL(logo, FlxG.stage.stageWidth, FlxG.stage.stageHeight);
-		}
-		catch (_:Dynamic)
-		{
+		} catch (_:Dynamic) {
 			logo = null;
 		}
 
@@ -81,7 +84,7 @@ class LaunchState extends FlxState
 
 		// Start process + monitors
 		launchGameAsync();
-		#if cpp
+		#if (windows && cpp)
 		initXInputOptional();
 		startIdleAndHotkeyMonitors();
 		#end
@@ -95,9 +98,7 @@ class LaunchState extends FlxState
 
 		if (proc != null)
 		{
-			try
-				proc.close()
-			catch (_:Dynamic) {}
+			try proc.close() catch (_:Dynamic) {}
 			proc = null;
 		}
 		super.destroy();
@@ -105,10 +106,8 @@ class LaunchState extends FlxState
 
 	private function returnToGameSelect():Void
 	{
-		// duration since we spawned the process
 		var secs = Math.max(0, (Date.now().getTime() - startTimeMs) / 1000.0);
 		util.Analytics.recordSession(game.id, secs);
-
 		FlxG.switchState(() -> new GameSelectState());
 	}
 
@@ -125,7 +124,7 @@ class LaunchState extends FlxState
 		}
 		#end
 
-		// Config-driven "Back" (or ESC fallback): kill game and return
+		// Config-driven "Back": kill game and return
 		if (backPressed())
 		{
 			killProcessAndExit();
@@ -164,8 +163,7 @@ class LaunchState extends FlxState
 		var maxH = Std.int(sh * 0.12);
 		d.scaleX = d.scaleY = 1;
 		var ow = d.width, oh = d.height;
-		if (ow <= 0 || oh <= 0)
-			return;
+		if (ow <= 0 || oh <= 0) return;
 		var sc = Math.min(maxW / ow, maxH / oh);
 		d.scaleX = d.scaleY = sc;
 		d.x = sw - Std.int(d.width) - 24;
@@ -176,7 +174,7 @@ class LaunchState extends FlxState
 	function launchGameAsync():Void
 	{
 		#if sys
-		var exe:String = game.exe; // explicit field you added
+		var exe:String = game.exe;
 		if (exe == null || exe == "" || !FileSystem.exists(exe))
 		{
 			Globals.log.line("[LAUNCH][ERROR] Executable missing: " + exe);
@@ -189,54 +187,36 @@ class LaunchState extends FlxState
 			try
 			{
 				Globals.log.line("[LAUNCH] Starting: " + exe);
-				// Use arg array so paths with spaces work without quoting hacks
 				proc = new Process(exe, []);
 
-				#if cpp
-				// Bind to a Job so child dies if launcher dies
-				try
-					bindProcessToJob(proc.getPid())
-				catch (_:Dynamic) {}
+				#if (windows && cpp)
+				try bindProcessToJob(proc.getPid()) catch (_:Dynamic) {}
 				#end
 
 				// stdout reader
 				Thread.create(() ->
 				{
-					try
-					{
+					try {
 						var ln:String;
 						while (proc != null)
 						{
-							try
-							{
-								ln = proc.stdout.readLine();
-								Globals.log.line("[GAME OUT] " + ln);
-							}
-							catch (e:Eof)
-								break;
+							try { ln = proc.stdout.readLine(); Globals.log.line("[GAME OUT] " + ln); }
+							catch (e:Eof) break;
 						}
-					}
-					catch (_:Dynamic) {}
+					} catch (_:Dynamic) {}
 				});
 
 				// stderr reader
 				Thread.create(() ->
 				{
-					try
-					{
+					try {
 						var ln:String;
 						while (proc != null)
 						{
-							try
-							{
-								ln = proc.stderr.readLine();
-								Globals.log.line("[GAME ERR] " + ln);
-							}
-							catch (e:Eof)
-								break;
+							try { ln = proc.stderr.readLine(); Globals.log.line("[GAME ERR] " + ln); }
+							catch (e:Eof) break;
 						}
-					}
-					catch (_:Dynamic) {}
+					} catch (_:Dynamic) {}
 				});
 
 				// Wait until the game exits
@@ -261,7 +241,7 @@ class LaunchState extends FlxState
 
 	function returnToMenuSoon():Void
 	{
-		FlxTween.num(0, 1, 0.25, {onComplete: _ -> FlxG.switchState(() -> new GameSelectState())});
+		FlxTween.num(0, 1, 0.25, { onComplete: _ -> FlxG.switchState(() -> new GameSelectState()) });
 	}
 
 	// Kill the running game (soft; hard on Windows), then return
@@ -273,39 +253,31 @@ class LaunchState extends FlxState
 			if (proc != null)
 			{
 				// Soft kill first
-				try
-					proc.kill()
-				catch (_:Dynamic) {}
+				try proc.kill() catch (_:Dynamic) {}
 
 				// If still alive, use a hard kill on Windows
 				#if windows
-				try
-				{
+				try {
 					var pid = proc.getPid();
 					var tk = new sys.io.Process("cmd", ["/c", "taskkill", "/PID", Std.string(pid), "/T", "/F"]);
 					tk.close();
-				}
-				catch (_:Dynamic) {}
+				} catch (_:Dynamic) {}
 				#end
 			}
 		}
 		catch (_:Dynamic) {}
 		#end
 
-		// Flag for main loop to bounce back
 		procExited = true;
 	}
 
 	/* ---------------------- Idle + Hotkey (Windows / C++) ---------------------- */
-	#if cpp
+	#if (windows && cpp)
 	inline function startIdleAndHotkeyMonitors():Void
 	{
 		Thread.create(() ->
 		{
-			var running = true;
-			var lastInputTick:Int = 0;
-
-			while (running)
+			while (true)
 			{
 				Sys.sleep(0.10);
 
@@ -315,9 +287,7 @@ class LaunchState extends FlxState
 
 				// Global hotkey: SHIFT+F12 (no focus required)
 				var down:Int = 0;
-				untyped __cpp__('
-					{ down = ((GetAsyncKeyState(VK_SHIFT)&0x8000) && (GetAsyncKeyState(VK_F12)&0x8000)) ? 1 : 0; }
-				');
+				untyped __cpp__('{ down = ((GetAsyncKeyState(VK_SHIFT)&0x8000) && (GetAsyncKeyState(VK_F12)&0x8000)) ? 1 : 0; }');
 				if (down != 0)
 				{
 					if (!hotkeyPressed)
@@ -348,7 +318,6 @@ class LaunchState extends FlxState
 				// Optional gamepad activity keeps it alive
 				if (idleSec >= 0.5 && checkXInputChanged())
 				{
-					// treat as activity -> set idleSec small
 					idleSec = 0.0;
 				}
 
@@ -376,9 +345,7 @@ class LaunchState extends FlxState
 						if (h) { TerminateProcess(h, 1); CloseHandle(h); }
 					}
 				', pid);
-				try
-					proc.kill()
-				catch (_:Dynamic) {}
+				try proc.kill() catch (_:Dynamic) {}
 			}
 		}
 		catch (_:Dynamic) {}
@@ -410,49 +377,34 @@ class LaunchState extends FlxState
 		', pid);
 	}
 
-	// -------- Optional XInput polling --------
-	var lastPadHash:Int = 0;
-
 	inline function initXInputOptional():Void
 	{
-		// Try multiple DLL names; ignore failures
-		try
-			XInputGetState = cpp.Lib.load("xinput1_4", "XInputGetState", 2)
-		catch (_:Dynamic) {}
+		// Try multiple DLL names; ignore failures (function pointer is called from Haxe)
+		try XInputGetState = cpp.Lib.load("xinput1_4", "XInputGetState", 2) catch (_:Dynamic) {}
 		if (XInputGetState == null)
-			try
-				XInputGetState = cpp.Lib.load("xinput1_3", "XInputGetState", 2)
-			catch (_:Dynamic) {}
+			try XInputGetState = cpp.Lib.load("xinput1_3", "XInputGetState", 2) catch (_:Dynamic) {}
 	}
 
+	// IMPORTANT: do not reference XINPUT_STATE or call the symbol in __cpp__.
+	// Call the loaded function pointer from Haxe and read a small native array.
 	inline function checkXInputChanged():Bool
 	{
 		if (XInputGetState == null)
 			return false;
 
-		var hash:Int = 0;
+		var hash = 0;
 		for (i in 0...4)
 		{
-			var ok:Int = 0;
-			var buttons:Int = 0;
-			var lx:Int = 0, ly:Int = 0, rx:Int = 0, ry:Int = 0, lt:Int = 0, rt:Int = 0;
-
-			untyped __cpp__('
-				{
-					XINPUT_STATE st; ZeroMemory(&st, sizeof(st));
-					ok = (XInputGetState({0}, &st) == ERROR_SUCCESS) ? 1 : 0;
-					if (ok)
-					{
-						buttons = (int)st.Gamepad.wButtons;
-						lx = (int)st.Gamepad.sThumbLX; ly = (int)st.Gamepad.sThumbLY;
-						rx = (int)st.Gamepad.sThumbRX; ry = (int)st.Gamepad.sThumbRY;
-						lt = (int)st.Gamepad.bLeftTrigger; rt = (int)st.Gamepad.bRightTrigger;
-					}
-				}
-			', i);
-
-			if (ok != 0)
+			var st = NativeArray.create(16); // small scratch buffer
+			// ERROR_SUCCESS == 0
+			var res:Int = XInputGetState(i, st);
+			if (res == 0)
+			{
+				var buttons = st[2];
+				var lx = st[3], ly = st[4], rx = st[5], ry = st[6];
+				var lt = st[7], rt = st[8];
 				hash ^= (buttons ^ lx ^ ly ^ rx ^ ry ^ lt ^ rt);
+			}
 		}
 
 		if (hash != 0 && hash != lastPadHash)
