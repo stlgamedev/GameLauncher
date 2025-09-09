@@ -24,15 +24,15 @@ class VortexNode implements IThemeNode
 	var downscale:Int = 3; // 2–4 good perf
 
 	// NEW tunables
-	var hueSpeed:Float    = 0.035; // was hardcoded; now param
-	var nudgeAmount:Float = 0.25;  // default kick
+	var hueSpeed:Float = 0.035; // was hardcoded; now param
+	var nudgeAmount:Float = 0.25; // default kick
 	var nudgeHalfLife:Float = 0.25; // seconds to halve boost
-	var boostMax:Float    = 0.5;   // clamp ceiling
-  
+	var boostMax:Float = 0.5; // clamp ceiling
 
 	// internal
 	var lastW:Int = 0;
 	var lastH:Int = 0;
+	var shaderReady:Bool = false;
 
 	public function new(el:ThemeElementSpec, _theme:Theme)
 	{
@@ -87,17 +87,17 @@ class VortexNode implements IThemeNode
 		mixDark = getFloat("mix", mixDark);
 		opacity = getFloat("opacity", opacity);
 		downscale = getInt("downscale", downscale);
-		hueSpeed      = getFloat("hueSpeed",    hueSpeed);
-    nudgeAmount   = getFloat("nudgeAmount", nudgeAmount);
-    nudgeHalfLife = getFloat("nudgeHalfLife", nudgeHalfLife);
-    boostMax      = getFloat("boostMax",    boostMax);
+		hueSpeed = getFloat("hueSpeed", hueSpeed);
+		nudgeAmount = getFloat("nudgeAmount", nudgeAmount);
+		nudgeHalfLife = getFloat("nudgeHalfLife", nudgeHalfLife);
+		boostMax = getFloat("boostMax", boostMax);
 
 		shader = new BgVortexShader();
 		spr = new FlxSprite();
 		spr.scrollFactor.set(0, 0);
 		spr.antialiasing = true;
-		spr.shader = shader;
-		spr.visible = true;
+	spr.shader = shader;
+	spr.visible = true;
 	}
 
 	public inline function get_name():String
@@ -115,7 +115,7 @@ class VortexNode implements IThemeNode
 		var w = ctx.w, h = ctx.h;
 		if (w != lastW || h != lastH || spr.pixels == null)
 		{
-			var rw =Std.int( Math.max(1, Std.int(w / Math.max(1, downscale))));
+			var rw = Std.int(Math.max(1, Std.int(w / Math.max(1, downscale))));
 			var rh = Std.int(Math.max(1, Std.int(h / Math.max(1, downscale))));
 			spr.makeGraphic(rw, rh, 0xFFFFFFFF, true);
 			spr.setGraphicSize(w, h);
@@ -126,13 +126,15 @@ class VortexNode implements IThemeNode
 			lastH = h;
 		}
 
+
+
 		// drive uniforms EVERY FRAME
 		var t = FlxG.game.ticks / 1000.0;
 		if (boost > 0)
 			boost = Math.max(0, boost - boostDecay * FlxG.elapsed);
 
 		shader.time = t;
-		shader.data.u_speed.value = [baseSpeed + boost];	
+		shader.data.u_speed.value = [baseSpeed + boost];
 		shader.data.u_scale.value = [scaleUniform];
 		shader.data.u_iter.value = [iterations];
 		shader.data.u_mix.value = [mixDark];
@@ -140,12 +142,12 @@ class VortexNode implements IThemeNode
 
 		// opacity takes effect here
 		spr.alpha = opacity;
-
 	}
 
 	/** Call when user moves carousel to add a momentary kick. */
-	public function nudge(amount:Float = -1):Void {
+	public function nudge(amount:Float = -1):Void
+	{
 		var a = (amount >= 0) ? amount : nudgeAmount;
 		boost = Math.min(boost + a, boostMax);
-	  }
+	}
 }

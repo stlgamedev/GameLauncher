@@ -4,13 +4,17 @@
 	xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
 
 	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="0.1.0"
-		company="STLGameDev" />
+		company="STLGameDev" package="com.axolstudio.stlgamelauncher" />
+	<meta package="com.axolstudio.stlgamelauncher" />
 
 	<window width="1920" height="1080" fps="60" background="#000000" hardware="true" />
 	<window if="desktop" orientation="landscape" fullscreen="true" resizable="false" />
+	<window allow-shaders="true" require-shaders="true" depth-buffer="true" stencil-buffer="true" />
+	<window allow-high-dpi="true" if="desktop" />
 
-	<set name="BUILD_DIR" value="export10" if="debug" unless="release" />
-	<set name="BUILD_DIR" value="C:\\Builds\\STLGameLauncher" if="release" unless="debug" />
+
+	<!-- <set name="BUILD_DIR" value="C:\Builds\STLGameLauncher" unless="debug" /> -->
+	<set name="BUILD_DIR" value="export" />
 
 
 	<source path="source" />
@@ -22,7 +26,6 @@
 	<haxelib name="openfl-aseprite" />
 	<haxelib name="hxCodec" />
 
-
 	<haxedef name="FLX_NO_HEALTH" />
 
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
@@ -30,18 +33,14 @@
 	<haxedef name="HXCPP_STACK_TRACE" if="debug" />
 	<haxedef name="HXCPP_STACK_LINE" if="debug" />
 
-
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
 	<architecture name="x64" if="windows" />
 
-
 	<haxedef name="import" value="Import" />
-
 
 	<haxedef name="dce=full" if="release" />
 	<haxedef name="HXCPP_STRIP" if="release" />
 	<haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
-
 
 	<haxedef name="no-console" if="windows" />
 	<haxedef name="noInlineImport" />

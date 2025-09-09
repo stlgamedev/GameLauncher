@@ -2,6 +2,7 @@
 #define VERSION "0.1.0"
 #define BuildRoot "C:\Builds\STLGameLauncher\windows\bin"
 
+
 [Setup]
 AppId=STLGameLauncher
 AppName=STLGameLauncher
@@ -9,13 +10,16 @@ AppVersion={#VERSION}
 AppPublisher=STLGameDev
 DefaultDirName={autopf}\STLGameLauncher
 DefaultGroupName=STLGameLauncher
-OutputDir=.
+OutputDir=C:\Builds\STLGameLauncher\
 OutputBaseFilename=STLGameLauncher-Setup-v{#StringChange(VERSION, ".", "_")}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64
 MinVersion=10.0.0
+; Ensure the install location prompt is shown
+; Do NOT set DisableDirPage=yes (leave it out or set to no)
+;DisableDirPage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -44,74 +48,129 @@ var
   EditServerBase, EditSubscription: TEdit;
 
 procedure InitializeWizard;
+var
+  L: TLabel;
 begin
   // --- Options Page ---
-  PageOptions := CreateCustomPage(wpSelectDir, 'Launcher Options', 'Set launcher mode and idle times');
+  // Place after the default directory page so user sees install location prompt
+  PageOptions := CreateCustomPage(wpSelectProgramGroup, 'Launcher Options', 'Set launcher mode and idle times');
+
+  L := TLabel.Create(PageOptions);
+  L.Parent := PageOptions.Surface;
+  L.Caption := 'Select launcher mode:';
+  L.Top := 8;
+  L.Left := 0;
+  L.Font.Style := [fsBold];
+
   RadioModeNormal := TRadioButton.Create(PageOptions);
   RadioModeNormal.Parent := PageOptions.Surface;
   RadioModeNormal.Caption := 'Normal mode';
   RadioModeNormal.Checked := True;
-  RadioModeNormal.Top := 8;
-  RadioModeNormal.Left := 0;
+  RadioModeNormal.Top := L.Top + L.Height + 8;
+  RadioModeNormal.Left := 16;
 
   RadioModeKiosk := TRadioButton.Create(PageOptions);
   RadioModeKiosk.Parent := PageOptions.Surface;
   RadioModeKiosk.Caption := 'Kiosk mode';
-  RadioModeKiosk.Top := 32;
-  RadioModeKiosk.Left := 0;
+  RadioModeKiosk.Top := RadioModeNormal.Top + RadioModeNormal.Height + 8;
+  RadioModeKiosk.Left := 16;
+
+  L := TLabel.Create(PageOptions);
+  L.Parent := PageOptions.Surface;
+  L.Caption := 'Idle time before attract mode (menu):';
+  L.Top := RadioModeKiosk.Top + RadioModeKiosk.Height + 16;
+  L.Left := 0;
 
   EditIdleMenu := TEdit.Create(PageOptions);
   EditIdleMenu.Parent := PageOptions.Surface;
-  EditIdleMenu.Top := 64;
-  EditIdleMenu.Left := 0;
-  EditIdleMenu.Width := 60;
+  EditIdleMenu.Top := L.Top + L.Height + 4;
+  EditIdleMenu.Left := 16;
+  EditIdleMenu.Width := 120;
   EditIdleMenu.Text := '180';
+
+  L := TLabel.Create(PageOptions);
+  L.Parent := PageOptions.Surface;
+  L.Caption := 'Idle time before attract mode (in-game):';
+  L.Top := EditIdleMenu.Top + EditIdleMenu.Height + 12;
+  L.Left := 0;
 
   EditIdleGame := TEdit.Create(PageOptions);
   EditIdleGame.Parent := PageOptions.Surface;
-  EditIdleGame.Top := 64;
-  EditIdleGame.Left := 80;
-  EditIdleGame.Width := 60;
+  EditIdleGame.Top := L.Top + L.Height + 4;
+  EditIdleGame.Left := 16;
+  EditIdleGame.Width := 120;
   EditIdleGame.Text := '300';
 
   // --- Paths Page ---
   PagePaths := CreateCustomPage(PageOptions.ID, 'Paths', 'Where content and logs live');
+
+  L := TLabel.Create(PagePaths);
+  L.Parent := PagePaths.Surface;
+  L.Caption := 'Content root (contains games/, trailers/, theme/):';
+  L.Top := 8;
+  L.Left := 0;
+
   EditContentRoot := TEdit.Create(PagePaths);
   EditContentRoot.Parent := PagePaths.Surface;
-  EditContentRoot.Top := 8;
-  EditContentRoot.Left := 0;
-  EditContentRoot.Width := 300;
-  EditContentRoot.Text := ExpandConstant('{commonappdata}\\STLGameLauncher\\external');
+  EditContentRoot.Top := L.Top + L.Height + 4;
+  EditContentRoot.Left := 16;
+  EditContentRoot.Width := 320;
+  EditContentRoot.Text := 'external';
+
+  L := TLabel.Create(PagePaths);
+  L.Parent := PagePaths.Surface;
+  L.Caption := 'Logs root:';
+  L.Top := EditContentRoot.Top + EditContentRoot.Height + 16;
+  L.Left := 0;
 
   EditLogsRoot := TEdit.Create(PagePaths);
   EditLogsRoot.Parent := PagePaths.Surface;
-  EditLogsRoot.Top := 40;
-  EditLogsRoot.Left := 0;
-  EditLogsRoot.Width := 300;
-  EditLogsRoot.Text := ExpandConstant('{commonappdata}\\STLGameLauncher\\logs');
+  EditLogsRoot.Top := L.Top + L.Height + 4;
+  EditLogsRoot.Left := 16;
+  EditLogsRoot.Width := 320;
+  EditLogsRoot.Text := 'logs';
 
   // --- Update/Server Page ---
   PageUpdate := CreateCustomPage(PagePaths.ID, 'Update & Server', 'Update and server settings');
+
+  L := TLabel.Create(PageUpdate);
+  L.Parent := PageUpdate.Surface;
+  L.Caption := 'Update behavior:';
+  L.Top := 8;
+  L.Left := 0;
+
   CheckUpdateOnLaunch := TCheckBox.Create(PageUpdate);
   CheckUpdateOnLaunch.Parent := PageUpdate.Surface;
-  CheckUpdateOnLaunch.Top := 8;
-  CheckUpdateOnLaunch.Left := 0;
-  CheckUpdateOnLaunch.Width := 300;
+  CheckUpdateOnLaunch.Top := L.Top + L.Height + 4;
+  CheckUpdateOnLaunch.Left := 16;
+  CheckUpdateOnLaunch.Width := 320;
   CheckUpdateOnLaunch.Caption := 'Check for updates when the application launches';
   CheckUpdateOnLaunch.Checked := True;
 
+  L := TLabel.Create(PageUpdate);
+  L.Parent := PageUpdate.Surface;
+  L.Caption := 'Subscription (e.g., arcade-jam-2018):';
+  L.Top := CheckUpdateOnLaunch.Top + CheckUpdateOnLaunch.Height + 16;
+  L.Left := 0;
+
   EditSubscription := TEdit.Create(PageUpdate);
   EditSubscription.Parent := PageUpdate.Surface;
-  EditSubscription.Top := 40;
-  EditSubscription.Left := 0;
-  EditSubscription.Width := 300;
+  EditSubscription.Top := L.Top + L.Height + 4;
+  EditSubscription.Left := 16;
+  EditSubscription.Width := 320;
   EditSubscription.Text := 'arcade-jam-2018';
+
+  L := TLabel.Create(PageUpdate);
+  L.Parent := PageUpdate.Surface;
+  L.Caption := 'Server base URL:';
+  L.Top := EditSubscription.Top + EditSubscription.Height + 16;
+  L.Left := 0;
 
   EditServerBase := TEdit.Create(PageUpdate);
   EditServerBase.Parent := PageUpdate.Surface;
-  EditServerBase.Top := 72;
-  EditServerBase.Left := 0;
-  EditServerBase.Width := 300;
+  EditServerBase.Top := L.Top + L.Height + 4;
+  EditServerBase.Left := 16;
+  EditServerBase.Width := 320;
   EditServerBase.Text := 'https://sgd.axolstudio.com/';
 end;
 
@@ -131,7 +190,10 @@ begin
     if LogsRoot = '' then LogsRoot := ExpandConstant('{commonappdata}\\STLGameLauncher\\logs');
     IdleMenu := Trim(EditIdleMenu.Text); if IdleMenu = '' then IdleMenu := '180';
     IdleGame := Trim(EditIdleGame.Text); if IdleGame = '' then IdleGame := '300';
-    UpdateOnLaunch := IfThen(CheckUpdateOnLaunch.Checked, 'true', 'false');
+    if CheckUpdateOnLaunch.Checked then
+      UpdateOnLaunch := 'true'
+    else
+      UpdateOnLaunch := 'false';
     ServerBase := Trim(EditServerBase.Text);
     if ServerBase = '' then ServerBase := 'https://sgd.axolstudio.com/';
 

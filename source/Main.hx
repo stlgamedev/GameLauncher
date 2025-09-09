@@ -1,11 +1,9 @@
 package;
 
-
 class Main extends Sprite
 {
 	public function new()
 	{
-
 		super();
 
 		var wantUpdate = false;
@@ -23,4 +21,3 @@ class Main extends Sprite
 		addChild(new flixel.FlxGame(1920, 1080, initState, 60, 60, true));
 	}
 }
-
