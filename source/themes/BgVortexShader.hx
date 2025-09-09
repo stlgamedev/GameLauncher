@@ -7,8 +7,6 @@ class BgVortexShader extends FlxShader
 {
 	public var time(get, set):Float;
 
-	// NOTE: No u_resolution anywhere. We rely on openfl_TextureSize + openfl_TextureCoordv.
-
 	@:glFragmentSource('
 	       #pragma header
 
@@ -85,8 +83,6 @@ class BgVortexShader extends FlxShader
 	public function new()
 	{
 		super();
-		// sensible defaults
-	util.UpdateSubState.appendStatic("__glFragmentSource: " + __glFragmentSource);
 		data.u_time.value = [0.0];
 		data.u_speed.value = [1.0];
 		data.u_scale.value = [2.2];

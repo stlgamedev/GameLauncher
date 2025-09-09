@@ -5,7 +5,6 @@ import flixel.input.gamepad.FlxGamepad;
 import flixel.input.gamepad.FlxGamepadInputID;
 import flixel.input.keyboard.FlxKey;
 
-/** Action names (stable, lower-case storage). */
 enum abstract Action(String) from String to String
 {
 	public var Prev = "prev";
@@ -15,13 +14,6 @@ enum abstract Action(String) from String to String
 	public var AdminExit = "admin_exit";
 }
 
-/**
- * Minimal but robust input mapper.
- * - configure(keys, pads): merges keyboard + gamepad tokens per Action.
- * - isPressed/justPressed: overloads for Action and String (kept for flexibility).
- * - Keyboard tokens: ENTER, SPACE, COMMA, SLASH, LEFT, RIGHT, UP, DOWN, A, D, ESCAPE, SHIFT, F12, SHIFT+F12 (combo)
- * - Gamepad tokens: PAD_A, PAD_B, PAD_X, PAD_Y, PAD_START, PAD_BACK (alias PAD_SELECT), PAD_LEFT/RIGHT/UP/DOWN
- */
 class InputMap
 {
 	public static var inst(default, null):InputMap = new InputMap();
@@ -130,8 +122,8 @@ class InputMap
 			}
 			else
 			{
-                var tk = padFromToken(t);
-                if (tk != FlxGamepadInputID.NONE && anyPadPressed(tk))
+				var tk = padFromToken(t);
+				if (tk != FlxGamepadInputID.NONE && anyPadPressed(tk))
 					return true;
 			}
 		}
@@ -162,8 +154,8 @@ class InputMap
 			}
 			else
 			{
-                var tk:FlxGamepadInputID = padFromToken(t);
-                if (tk != FlxGamepadInputID.NONE && anyPadJustPressed(tk))
+				var tk:FlxGamepadInputID = padFromToken(t);
+				if (tk != FlxGamepadInputID.NONE && anyPadJustPressed(tk))
 					return true;
 			}
 		}

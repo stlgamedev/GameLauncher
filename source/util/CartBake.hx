@@ -3,6 +3,7 @@ package util;
 import haxe.crypto.Crc32;
 import haxe.io.Bytes;
 import haxe.io.Path;
+import util.Paths;
 import sys.FileSystem;
 import sys.io.File;
 import flixel.FlxG;
@@ -42,7 +43,7 @@ class CartBake
 		}
 
 		final outDir = Path.join([Globals.cfg.contentRootDir, SUBDIR]);
-		ensureDir(outDir);
+		Paths.ensureDir(outDir);
 
 		final frameBD = loadBD(frameAbs);
 		if (frameBD == null)
@@ -158,19 +159,17 @@ class CartBake
 	}
 
 	// -------- utils (std / openfl) --------
-	static inline function ensureDir(p:String):Void
-	{
-		if (!FileSystem.exists(p))
-			FileSystem.createDirectory(p);
-	}
 
 	static function loadBD(abs:String):BitmapData
 	{
 		try
-			return BitmapData.fromFile(abs)
+		{
+			return BitmapData.fromFile(abs);
+		}
 		catch (_:Dynamic) {}
 		return null;
 	}
+
 	static function ensureFlixelCache(path:String):Void
 	{
 		var gr:FlxGraphic = FlxG.bitmap.get(path);

@@ -1,11 +1,9 @@
 package themes;
 
-
-
 import flixel.graphics.frames.FlxAtlasFrames;
+
 using StringTools;
 
-/* ---------------- Spec ---------------- */
 typedef ThemeSpec =
 {
 	var id:String;
@@ -28,7 +26,6 @@ typedef ThemeElementSpec =
 	@:optional var initialVisible:Null<Bool>;
 }
 
-/* --------------- Context --------------- */
 typedef Context =
 {
 	var w:Int;
@@ -37,7 +34,6 @@ typedef Context =
 	var resolveVar:(name:String, offset:Int) -> String;
 }
 
-/* --------------- Node interface --------------- */
 interface IThemeNode
 {
 	public var name(get, never):String;
@@ -1142,7 +1138,9 @@ private class GlassNode implements IThemeNode
 private class GenresNode implements IThemeNode
 {
 	public var name(get, never):String;
-	inline function get_name():String return _name;
+
+	inline function get_name():String
+		return _name;
 
 	var _name:String;
 	final el:ThemeElementSpec;
@@ -1160,7 +1158,7 @@ private class GenresNode implements IThemeNode
 	// params
 	var chipW:Int = 96;
 	var chipH:Int = 96;
-	var gap:Int   = 16;
+	var gap:Int = 16;
 	var align:String = "right"; // "left" | "right"
 
 	// static genre atlas
@@ -1175,32 +1173,40 @@ private class GenresNode implements IThemeNode
 
 		// read params
 		chipW = Theme.pInt(el.params, "chipW", chipW, 8, 4096);
-		chipH = Theme.pInt(el.params, "chipH",  chipH, 8, 4096);
-		gap   = Theme.pInt(el.params, "gap", gap, 0, 4096);
-		align = (el.params != null && Reflect.hasField(el.params, "align")) ? Std.string(Reflect.field(el.params,"align")) : "right";
+		chipH = Theme.pInt(el.params, "chipH", chipH, 8, 4096);
+		gap = Theme.pInt(el.params, "gap", gap, 0, 4096);
+		align = (el.params != null && Reflect.hasField(el.params, "align")) ? Std.string(Reflect.field(el.params, "align")) : "right";
 
 		// Load genre atlas once
-		if (genreFrames == null) {
+		if (genreFrames == null)
+		{
 			genreFrames = FlxAtlasFrames.fromSparrow("assets/images/genres.png", "assets/images/genres.xml");
 		}
 	}
 
-	public function basic():FlxBasic return group;
-	public function addTo(state:FlxState):Void state.add(group);
+	public function basic():FlxBasic
+		return group;
+
+	public function addTo(state:FlxState):Void
+		state.add(group);
 
 	public function update(ctx:Context):Void
 	{
 		// Update our rect from pos/size
 		var p = Theme.parseXY(el.pos, ctx.w, ctx.h);
 		var s = Theme.parseWH(el.size, ctx.w, ctx.h);
-		x0 = p.x; y0 = p.y; rw = s.w; rh = s.h;
+		x0 = p.x;
+		y0 = p.y;
+		rw = s.w;
+		rh = s.h;
 
 		// Collect genres via %GENRE1..N% using the existing resolver
 		var names = new Array<String>();
 		for (k in 1...20) // up to 19 genres; raise if needed
 		{
 			var v = ctx.resolveVar("GENRE" + k, 0);
-			if (v == null || v == "") break;
+			if (v == null || v == "")
+				break;
 			names.push(v);
 		}
 
@@ -1213,9 +1219,7 @@ private class GenresNode implements IThemeNode
 		ensurePool(genres.length);
 
 		// Start horizontally inside our rect; align right by default
-		var startX = (align == "right")
-			? (x0 + rw - chipW)
-			: x0;
+		var startX = (align == "right") ? (x0 + rw - chipW) : x0;
 
 		var yTop = y0 + Std.int((rh - chipH) * 0.5); // vertically centered inside our slot
 
@@ -1223,20 +1227,22 @@ private class GenresNode implements IThemeNode
 		{
 			var vis = (i < genres.length);
 			icons[i].visible = vis;
-			if (!vis) continue;
+			if (!vis)
+				continue;
 
-			var bx = (align == "right")
-				? startX - i * (chipW + gap)
-				: startX + i * (chipW + gap);
+			var bx = (align == "right") ? startX - i * (chipW + gap) : startX + i * (chipW + gap);
 			var by = yTop;
 
 			// Set genre icon from atlas
 			var frameName = genres[i].toLowerCase();
-			if (genreFrames != null && genreFrames.exists(frameName)) {
+			if (genreFrames != null && genreFrames.exists(frameName))
+			{
 				icons[i].frames = genreFrames;
 				icons[i].animation.frameName = frameName;
 				icons[i].setGraphicSize(chipW, chipH);
-			} else {
+			}
+			else
+			{
 				icons[i].makeGraphic(chipW, chipH, FlxColor.TRANSPARENT);
 			}
 			icons[i].x = bx;

@@ -12,14 +12,10 @@
 	<window allow-shaders="true" require-shaders="true" depth-buffer="true" stencil-buffer="true" />
 	<window allow-high-dpi="true" if="desktop" />
 
-
-	<!-- <set name="BUILD_DIR" value="C:\Builds\STLGameLauncher" unless="debug" /> -->
 	<set name="BUILD_DIR" value="export" />
-
 
 	<source path="source" />
 	<assets path="assets" embed="true" />
-
 
 	<haxelib name="flixel" />
 
@@ -45,7 +41,13 @@
 	<haxedef name="no-console" if="windows" />
 	<haxedef name="noInlineImport" />
 
+	<!-- Prebuild: generate version.rc from Project.xml version for Windows builds -->
+	<prebuild if="windows">
+		<arg>python</arg>
+		<arg>scripts/generate_version_rc.py</arg>
+	</prebuild>
 
-	<!-- Icon (optional) -->
-	<!-- <icon path="assets/icon/icon.png" /> -->
+	<!-- Template: copy version.rc into build output for Windows builds -->
+	<template path="export/windows/bin/version.rc" rename="version.rc" if="windows" />
+
 </project>

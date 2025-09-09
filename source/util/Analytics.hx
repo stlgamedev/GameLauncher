@@ -2,16 +2,12 @@ package util;
 
 import haxe.Json;
 import haxe.io.Path;
+import util.Paths;
 import sys.FileSystem;
 import sys.io.File;
 
 /**
- * Ultra-light analytics:
- * - counts launches per game
- * - stores lastPlayed (UTC ms) and optional totalSeconds
- * - one JSON file in content root:  <contentRoot>/analytics/usage.json
- *
- * Safe to call on HL/Windows. No spammy logs; silent failure on IO errors.
+ * Ultra-light analytics: counts launches, lastPlayed, totalSeconds per game. One JSON file in content root. Silent on IO errors.
  */
 class Analytics
 {
@@ -28,7 +24,7 @@ class Analytics
 		if (loaded)
 			return;
 		path = Path.join([contentRoot, SUBDIR, FILE]);
-		ensureDir(Path.join([contentRoot, SUBDIR]));
+		Paths.ensureDir(Path.join([contentRoot, SUBDIR]));
 		load();
 	}
 
@@ -98,18 +94,6 @@ class Analytics
 		try
 		{
 			File.saveContent(path, Json.stringify(data));
-		}
-		catch (_:Dynamic) {}
-		#end
-	}
-
-	static function ensureDir(dir:String):Void
-	{
-		#if sys
-		try
-		{
-			if (!FileSystem.exists(dir))
-				FileSystem.createDirectory(dir);
 		}
 		catch (_:Dynamic) {}
 		#end

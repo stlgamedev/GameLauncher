@@ -3,7 +3,8 @@ package util;
 import haxe.io.Path;
 import sys.FileSystem;
 
-class Paths {
+class Paths
+{
 	/** Root for content (games/trailers/theme). Falls back to "external". */
 	public static function contentRoot():String
 	{
@@ -56,5 +57,27 @@ class Paths {
 			return;
 		if (!FileSystem.exists(p))
 			FileSystem.createDirectory(p);
+	}
+
+	public static inline function safeReadDir(dir:String):Array<String>
+	{
+		try
+		{
+			return FileSystem.readDirectory(dir);
+		}
+		catch (_:Dynamic)
+		{
+			return [];
+		}
+	}
+
+	public static inline function strOrNull(v:Dynamic):Null<String>
+	{
+		return v == null ? null : Std.string(v).trim();
+	}
+
+	public static inline function strOrEmpty(v:Dynamic):String
+	{
+		return v == null ? "" : Std.string(v).trim();
 	}
 }

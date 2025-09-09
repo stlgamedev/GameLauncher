@@ -5,6 +5,7 @@ import flixel.graphics.FlxGraphic;
 import haxe.io.Path;
 import openfl.display.BitmapData;
 import sys.FileSystem;
+import util.Paths;
 
 class Preload
 {
@@ -18,16 +19,12 @@ class Preload
 				continue;
 
 			var abs = g.box;
-			if (!isAbsolute(abs))
+			if (!Paths.normalize(abs).startsWith(Paths.contentRoot()))
 			{
-				var root = (Globals.cfg != null && Globals.cfg.contentRootDir != null && Globals.cfg.contentRootDir != "") ? Globals.cfg.contentRootDir : "external";
-				abs = Path.join([root, abs]);
+				abs = Path.join([Paths.contentRoot(), abs]);
 			}
 			if (!FileSystem.exists(abs))
-			{
-				util.Logger.Log.line("[PRELOAD][MISS] " + abs);
 				continue;
-			}
 
 			var gr:FlxGraphic = FlxG.bitmap.get(abs);
 			if (gr == null)
@@ -45,10 +42,7 @@ class Preload
 						}
 					}
 				}
-				catch (e:Dynamic)
-				{
-					util.Logger.Log.line("[PRELOAD][ERROR] " + abs + " :: " + Std.string(e));
-				}
+				catch (e:Dynamic) {}
 			}
 		}
 	}
@@ -57,17 +51,5 @@ class Preload
 	{
 		// We key by absolute path in FlxG.bitmap
 		return FlxG.bitmap.get(absPath) != null;
-	}
-
-	static inline function isAbsolute(p:String):Bool
-	{
-		if (p == null || p == "")
-			return false;
-		var c0 = p.charAt(0);
-		if (c0 == "/" || c0 == "\\")
-			return true;
-		if (p.length >= 2 && p.charAt(1) == ":")
-			return true; // C:\
-		return false;
 	}
 }

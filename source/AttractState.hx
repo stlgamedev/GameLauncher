@@ -13,14 +13,9 @@ import hxcodec.flixel.FlxVideo;
 
 class AttractState extends FlxState
 {
-	// Playlist
 	var videos:Array<String> = [];
 	var vidIdx:Int = -1;
-
-	// UI
 	var label:FlxText;
-
-	// Current player (hxCodec)
 	#if hxcodec
 	var player:FlxVideo;
 	#end
@@ -71,7 +66,6 @@ class AttractState extends FlxState
 	{
 		super.update(elapsed);
 
-		// Any user activity should exit attract mode immediately
 		if (anyUserActivity())
 		{
 			#if hxcodec
@@ -84,8 +78,6 @@ class AttractState extends FlxState
 			return;
 		}
 	}
-
-	// ---------------- helpers ----------------
 
 	function buildVideoList():Void
 	{

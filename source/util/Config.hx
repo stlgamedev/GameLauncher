@@ -191,8 +191,8 @@ class Config
 	{
 		c.contentRootDir = normalizePath(c.contentRootDir);
 		c.logsRoot = normalizePath(c.logsRoot);
-		ensureDir(c.contentRootDir);
-		ensureDir(c.logsRoot);
+		util.Paths.ensureDir(c.contentRootDir);
+		util.Paths.ensureDir(c.logsRoot);
 	}
 
 	/* ================= Helpers ================= */
@@ -272,26 +272,5 @@ class Config
 		var isAbs = Path.isAbsolute(p) || (p.length > 1 && p.charAt(1) == ":");
 		var full = isAbs ? p : Path.normalize(Sys.getCwd() + "/" + p);
 		return Path.normalize(full);
-	}
-
-	static function ensureDir(dir:String):Void
-	{
-		if (dir == null || dir == "")
-			return;
-		try
-		{
-			if (!FileSystem.exists(dir))
-			{
-				FileSystem.createDirectory(dir);
-			}
-			else if (!FileSystem.isDirectory(dir))
-			{
-				Log.line("[CFG][WARN] Path exists but is not a directory: " + dir);
-			}
-		}
-		catch (e:Dynamic)
-		{
-			Log.line("[CFG][ERROR] Could not ensure directory: " + dir + " :: " + Std.string(e));
-		}
 	}
 }

@@ -4,6 +4,7 @@ import sys.FileSystem;
 import sys.io.File;
 #end
 import util.UpdateSubState;
+import flixel.FlxState;
 
 typedef UpdateNeeded =
 {
@@ -80,17 +81,17 @@ class BootState extends FlxState
 				Globals.cfg = util.Config.load();
 				if (Globals.cfg == null)
 				{
-					Log.line("[BOOT] No config found, created default.");
+					Log.line("[BOOT][ERROR] No config found, created default.");
 					Sys.exit(1);
 				}
 				util.InputMap.inst.configure(Globals.cfg.controlsKeys, Globals.cfg.controlsPads);
-				Log.line("[BOOT] Config loaded. content_root=" + Globals.cfg.contentRootDir + ", subscription=" + Globals.cfg.subscription);
+				// Log only if config is missing or invalid
 
 				// >>> App update check first, only check content if no app update <<<
 
 				if (Globals.cfg.updateOnLaunch)
 				{
-					Log.line("[BOOT] update_on_launch=true -> checking for updates via UpdateSubState");
+					// Log only if update check fails
 					openSubState(new util.UpdateSubState(util.UpdateMode.AppUpdateOrContent(Globals.cfg.subscription), function()
 					{
 						stepDone("Config");
@@ -108,13 +109,14 @@ class BootState extends FlxState
 				#if sys
 				cleanupLogs();
 				#end
-				Log.line("[BOOT] Content dirs ensured.");
+				// Log only if content dir creation fails
 				stepDone("Content dirs");
 
 			case 3:
 				// Scan games
 				Globals.games = GameIndex.scanGames();
-				Log.line("[BOOT] Discovered " + Globals.games.length + " game(s).");
+				if (Globals.games.length == 0)
+					Log.line("[BOOT][ERROR] No games found.");
 				stepDone("Scan games");
 
 			case 4:
@@ -123,15 +125,15 @@ class BootState extends FlxState
 				Globals.theme = themes.Theme.load(themeDir);
 				Globals.theme.preloadAssets();
 				Globals.theme.preloadFonts();
-				trace('Font cache size: ' + Globals.theme._fontCache); // or expose a method to read it
+				// Removed debug trace
 
-				Log.line("[BOOT] Theme loaded from: " + themeDir);
+				// Log only if theme load fails
 				stepDone("Load theme");
 
 			case 5:
 				// Bake Carts (small, disk-friendly)
 				final frameAbs = HxPath.join([Globals.theme.dir, "cart_frame.png"]);
-				Log.line("[BOOT] Cart frame = " + frameAbs);
+				// Log only if cart frame is missing
 				CartBake.TARGET_WIDTH = 200; // tweakable
 				CartBake.buildAll(Globals.games, frameAbs);
 				stepDone("Bake carts");
@@ -158,15 +160,14 @@ class BootState extends FlxState
 	#if sys
 	function cleanupLogs():Void
 	{
-		// --- Clean up old logs (>30 days) ---
+		// Clean up old logs (>30 days)
 		try
 		{
-			var logDir = Globals.cfg.logsRoot; // already normalized by Config
+			var logDir = Globals.cfg.logsRoot;
 			if (FileSystem.exists(logDir) && FileSystem.isDirectory(logDir))
 			{
 				var now = Date.now().getTime();
-				var cutoff = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
-
+				var cutoff = 30 * 24 * 60 * 60 * 1000;
 				for (f in FileSystem.readDirectory(logDir))
 				{
 					var abs = Path.join([logDir, f]);
@@ -177,13 +178,10 @@ class BootState extends FlxState
 						if (age > cutoff)
 						{
 							FileSystem.deleteFile(abs);
-							Globals.log.line("[LOG] Deleted old log: " + abs);
+							// Only log if a log file is deleted (optional)
 						}
 					}
-					catch (_:Dynamic)
-					{
-						// ignore bad entries
-					}
+					catch (_:Dynamic) {}
 				}
 			}
 		}

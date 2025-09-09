@@ -4,6 +4,7 @@ import flixel.FlxBasic;
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.FlxState;
+import themes.Theme.IThemeNode;
 
 class VortexNode implements IThemeNode
 {
@@ -96,8 +97,8 @@ class VortexNode implements IThemeNode
 		spr = new FlxSprite();
 		spr.scrollFactor.set(0, 0);
 		spr.antialiasing = true;
-	spr.shader = shader;
-	spr.visible = true;
+		spr.shader = shader;
+		spr.visible = true;
 	}
 
 	public inline function get_name():String
@@ -125,8 +126,6 @@ class VortexNode implements IThemeNode
 			lastW = w;
 			lastH = h;
 		}
-
-
 
 		// drive uniforms EVERY FRAME
 		var t = FlxG.game.ticks / 1000.0;

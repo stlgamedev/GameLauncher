@@ -1,6 +1,7 @@
 package;
 
-
+import flixel.FlxState;
+import themes.Theme.Context;
 
 using StringTools;
 
@@ -43,10 +44,8 @@ class GameSelectState extends FlxState
 	{
 		super.update(elapsed);
 
-		// Always tick theme animations (vortex, etc.)
 		theme.updateAll(makeContext());
 
-		// If we're launching, ignore all inputs (still let background animate)
 		if (launching)
 		{
 			return;
@@ -73,7 +72,6 @@ class GameSelectState extends FlxState
 			return;
 		}
 
-		// Carousel navigation (guarded by animation lock)
 		var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
 		var canNavigate = (car == null) || !car.isAnimating();
 
@@ -105,22 +103,19 @@ class GameSelectState extends FlxState
 			}
 		}
 
-		// Launch game on ENTER (theme-provided launch sound, then switch)
 		if (Globals.games.length > 0 && enter)
 		{
-			launching = true; // lock all inputs
-
+			launching = true;
 			var g = Globals.games[selected];
 			var go = function()
 			{
 				util.Analytics.recordLaunch(g.id);
 				FlxG.switchState(() -> new LaunchState(g));
 			};
-
 			var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
 			if (car != null && car.playLaunchSound(go))
 			{
-				// switch happens Globals.input onComplete
+				// switch happens onComplete
 			}
 			else
 			{
@@ -137,11 +132,9 @@ class GameSelectState extends FlxState
 
 		final newSel = (selected + delta + n) % n;
 
-		// kick vortex (optional)
 		var vort:themes.VortexNode = cast theme.getNodeByName("vortex");
 		if (vort != null)
 		{
-			// your VortexNode should expose a nudge(); if not, remove this
 			try
 			{
 				untyped vort.nudge();
@@ -149,15 +142,11 @@ class GameSelectState extends FlxState
 			catch (_:Dynamic) {}
 		}
 
-		// animate carousel THEN snap to newSel inside carousel
 		var car:themes.CarouselNode = cast theme.getNodeByName("carousel");
 		if (car != null)
 			car.move(delta, newSel);
 
-		// commit selection immediately (context will read this)
 		selected = newSel;
-
-		// update text/cover under the CRT with static flash
 		applySelection(false);
 	}
 
@@ -243,10 +232,8 @@ class GameSelectState extends FlxState
 			stat.visible = true;
 		}
 
-		// update content under static
 		theme.updateAll(makeContext());
 
-		// reveal cover
 		staticTimer = new FlxTimer().start(0.30, (_) ->
 		{
 			var s1 = getSprite("static");
