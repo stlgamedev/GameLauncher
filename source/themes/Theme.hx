@@ -1,6 +1,5 @@
 package themes;
 
-import flixel.graphics.frames.FlxAtlasFrames;
 
 using StringTools;
 

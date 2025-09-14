@@ -3,7 +3,7 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
 
-	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="0.1.0"
+	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="0.2.0"
 		company="STLGameDev" package="com.axolstudio.stlgamelauncher" />
 	<meta package="com.axolstudio.stlgamelauncher" />
 
@@ -22,6 +22,8 @@
 	<haxelib name="openfl-aseprite" />
 	<haxelib name="hxCodec" />
 
+	 
+
 	<haxedef name="FLX_NO_HEALTH" />
 
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
@@ -32,14 +34,11 @@
 	<haxedef name="FLX_NO_DEBUG" unless="debug" />
 	<architecture name="x64" if="windows" />
 
-	<haxedef name="import" value="Import" />
-
 	<haxedef name="dce=full" if="release" />
 	<haxedef name="HXCPP_STRIP" if="release" />
 	<haxedef name="HXCPP_OPTIMIZE_LINK" if="release" />
 
 	<haxedef name="no-console" if="windows" />
-	<haxedef name="noInlineImport" />
 
 	<!-- Prebuild: generate version.rc from Project.xml version for Windows builds -->
 	<prebuild if="windows">

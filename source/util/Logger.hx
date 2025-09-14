@@ -1,5 +1,12 @@
 package util;
 
+import sys.io.FileOutput;
+import sys.FileSystem;
+import haxe.io.Path;
+import sys.io.File;
+import util.Paths;
+import util.Globals;
+
 class Log
 {
 	public static inline function line(s:String)

@@ -1,8 +1,5 @@
 package util;
 
-import haxe.io.Path;
-import sys.FileSystem;
-import sys.io.File;
 
 using StringTools;
 

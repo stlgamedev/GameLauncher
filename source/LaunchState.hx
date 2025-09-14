@@ -1,8 +1,5 @@
 package;
 
-#if (windows && cpp)
-import cpp.NativeArray;
-#end
 import aseprite.Aseprite;
 import flixel.FlxG;
 import flixel.FlxState;
@@ -15,12 +12,18 @@ import sys.io.Process;
 import sys.thread.Thread;
 import util.InputMap.Action;
 
+// Include WinAPI headers when compiling for Windows C++
+#if (windows && cpp)
+import cpp.NativeArray;
+@:cppFileCode('#include <Windows.h>\n#include <Xinput.h>')
+#end
+
 class LaunchState extends FlxState
 {
 	public var game:util.GameEntry;
 
 	var splash:flixel.FlxSprite; // centered box art (fit)
-	var logo:Aseprite; // spinner shown in BR corner (same as BootState)
+	var logo:Aseprite;           // spinner shown in BR corner (same as BootState)
 
 	var proc:Process = null;
 	var procExited:Bool = false;
@@ -32,6 +35,7 @@ class LaunchState extends FlxState
 
 	var startTimeMs:Float = Date.now().getTime();
 
+	// Optional XInput dynamic
 	#if (windows && cpp)
 	var XInputGetState:Dynamic = null; // loaded at runtime if available
 	var lastPadHash:Int = 0;
@@ -53,29 +57,24 @@ class LaunchState extends FlxState
 		var boxPath = game.box;
 		if (boxPath != null && FileSystem.exists(boxPath))
 		{
-			try
-			{
+			try {
 				var bd = BitmapData.fromFile(boxPath);
 				splash.loadGraphic(bd);
-			}
-			catch (_:Dynamic) {}
+			} catch (_:Dynamic) {}
 		}
 		splash.antialiasing = true;
 		add(splash);
 		resizeSplash();
 
 		// --- Spinner (same asset/placement as BootState) ---
-		try
-		{
+		try {
 			var bytes = Assets.getBytes("assets/images/spinning_icon.aseprite");
 			logo = Aseprite.fromBytes(bytes);
 			logo.play();
 			logo.mouseEnabled = logo.mouseChildren = false;
 			FlxG.stage.addChild(logo);
 			fitOpenFL(logo, FlxG.stage.stageWidth, FlxG.stage.stageHeight);
-		}
-		catch (_:Dynamic)
-		{
+		} catch (_:Dynamic) {
 			logo = null;
 		}
 
@@ -99,9 +98,7 @@ class LaunchState extends FlxState
 
 		if (proc != null)
 		{
-			try
-				proc.close()
-			catch (_:Dynamic) {}
+			try proc.close() catch (_:Dynamic) {}
 			proc = null;
 		}
 		super.destroy();
@@ -166,8 +163,7 @@ class LaunchState extends FlxState
 		var maxH = Std.int(sh * 0.12);
 		d.scaleX = d.scaleY = 1;
 		var ow = d.width, oh = d.height;
-		if (ow <= 0 || oh <= 0)
-			return;
+		if (ow <= 0 || oh <= 0) return;
 		var sc = Math.min(maxW / ow, maxH / oh);
 		d.scaleX = d.scaleY = sc;
 		d.x = sw - Std.int(d.width) - 24;
@@ -194,47 +190,33 @@ class LaunchState extends FlxState
 				proc = new Process(exe, []);
 
 				#if (windows && cpp)
-				try
-					bindProcessToJob(proc.getPid())
-				catch (_:Dynamic) {}
+				try bindProcessToJob(proc.getPid()) catch (_:Dynamic) {}
 				#end
 
 				// stdout reader
 				Thread.create(() ->
 				{
-					try
-					{
+					try {
 						var ln:String;
 						while (proc != null)
 						{
-							try
-							{
-								ln = proc.stdout.readLine(); /* Only log important output if needed */}
-							catch (e:Eof)
-								break;
+							try { ln = proc.stdout.readLine(); Globals.log.line("[GAME OUT] " + ln); }
+							catch (e:Eof) break;
 						}
-					}
-					catch (_:Dynamic) {}
+					} catch (_:Dynamic) {}
 				});
 
 				// stderr reader
 				Thread.create(() ->
 				{
-					try
-					{
+					try {
 						var ln:String;
 						while (proc != null)
 						{
-							try
-							{
-								ln = proc.stderr.readLine();
-								Globals.log.line("[GAME ERR] " + ln);
-							}
-							catch (e:Eof)
-								break;
+							try { ln = proc.stderr.readLine(); Globals.log.line("[GAME ERR] " + ln); }
+							catch (e:Eof) break;
 						}
-					}
-					catch (_:Dynamic) {}
+					} catch (_:Dynamic) {}
 				});
 
 				// Wait until the game exits
@@ -252,14 +234,14 @@ class LaunchState extends FlxState
 			procExited = true; // emulate finally
 		});
 		#else
-		Globals.log.line("[LAUNCH][ERROR] sys target required to spawn process.");
+		Globals.log.line("[LAUNCH][WARN] sys target required to spawn process.");
 		returnToMenuSoon();
 		#end
 	}
 
 	function returnToMenuSoon():Void
 	{
-		FlxTween.num(0, 1, 0.25, {onComplete: _ -> FlxG.switchState(() -> new GameSelectState())});
+		FlxTween.num(0, 1, 0.25, { onComplete: _ -> FlxG.switchState(() -> new GameSelectState()) });
 	}
 
 	// Kill the running game (soft; hard on Windows), then return
@@ -271,19 +253,15 @@ class LaunchState extends FlxState
 			if (proc != null)
 			{
 				// Soft kill first
-				try
-					proc.kill()
-				catch (_:Dynamic) {}
+				try proc.kill() catch (_:Dynamic) {}
 
 				// If still alive, use a hard kill on Windows
 				#if windows
-				try
-				{
+				try {
 					var pid = proc.getPid();
 					var tk = new sys.io.Process("cmd", ["/c", "taskkill", "/PID", Std.string(pid), "/T", "/F"]);
 					tk.close();
-				}
-				catch (_:Dynamic) {}
+				} catch (_:Dynamic) {}
 				#end
 			}
 		}
@@ -367,9 +345,7 @@ class LaunchState extends FlxState
 						if (h) { TerminateProcess(h, 1); CloseHandle(h); }
 					}
 				', pid);
-				try
-					proc.kill()
-				catch (_:Dynamic) {}
+				try proc.kill() catch (_:Dynamic) {}
 			}
 		}
 		catch (_:Dynamic) {}
@@ -404,13 +380,9 @@ class LaunchState extends FlxState
 	inline function initXInputOptional():Void
 	{
 		// Try multiple DLL names; ignore failures (function pointer is called from Haxe)
-		try
-			XInputGetState = cpp.Lib.load("xinput1_4", "XInputGetState", 2)
-		catch (_:Dynamic) {}
+		try XInputGetState = cpp.Lib.load("xinput1_4", "XInputGetState", 2) catch (_:Dynamic) {}
 		if (XInputGetState == null)
-			try
-				XInputGetState = cpp.Lib.load("xinput1_3", "XInputGetState", 2)
-			catch (_:Dynamic) {}
+			try XInputGetState = cpp.Lib.load("xinput1_3", "XInputGetState", 2) catch (_:Dynamic) {}
 	}
 
 	// IMPORTANT: do not reference XINPUT_STATE or call the symbol in __cpp__.

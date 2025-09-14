@@ -1,10 +1,5 @@
 package themes;
 
-import flixel.FlxBasic;
-import flixel.FlxG;
-import flixel.FlxSprite;
-import flixel.FlxState;
-import themes.Theme.IThemeNode;
 
 class VortexNode implements IThemeNode
 {

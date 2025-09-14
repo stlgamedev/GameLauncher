@@ -2,6 +2,7 @@ package;
 
 import flixel.FlxG;
 import flixel.FlxState;
+import util.Globals;
 import util.UpdateSubState;
 
 class UpdateOnlyState extends FlxState

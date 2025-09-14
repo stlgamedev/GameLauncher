@@ -1,6 +1,5 @@
 package themes;
 
-import flixel.system.FlxAssets.FlxShader;
 
 @:keep
 class BgVortexShader extends FlxShader

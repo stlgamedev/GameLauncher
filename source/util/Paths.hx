@@ -2,7 +2,13 @@ package util;
 
 import haxe.io.Path;
 import sys.FileSystem;
+import util.Globals;
+import StringTools;
+using StringTools;
 
+/**
+ * Paths
+ **/
 class Paths
 {
 	/** Root for content (games/trailers/theme). Falls back to "external". */

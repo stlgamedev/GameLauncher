@@ -1,6 +1,10 @@
 package;
 
 import openfl.display.Sprite;
+import flixel.FlxGame;
+import flixel.FlxState;
+import BootState;
+import UpdateOnlyState;
 
 class Main extends Sprite
 {

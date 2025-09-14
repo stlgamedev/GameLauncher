@@ -2,8 +2,6 @@ package util;
 
 using StringTools;
 
-import util.Paths;
-
 class GameIndex
 {
 	public static function scanGames():Array<GameEntry>

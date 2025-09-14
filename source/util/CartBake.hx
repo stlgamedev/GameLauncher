@@ -1,21 +1,5 @@
 package util;
 
-import haxe.crypto.Crc32;
-import haxe.io.Bytes;
-import haxe.io.Path;
-import util.Paths;
-import sys.FileSystem;
-import sys.io.File;
-import flixel.FlxG;
-import flixel.graphics.FlxGraphic;
-import flixel.util.FlxColor;
-import openfl.display.BitmapData;
-import openfl.display.PNGEncoderOptions;
-import openfl.geom.ColorTransform;
-import openfl.geom.Matrix;
-import openfl.geom.Rectangle;
-import openfl.utils.ByteArray;
-
 class CartBake
 {
 	static inline var SUBDIR = "cache/carts";

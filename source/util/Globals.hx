@@ -1,5 +1,10 @@
 package util;
 
+import util.Logger;
+import util.Config;
+import util.GameEntry;
+import themes.Theme;
+
 class Globals
 {
 	public static var APP_VERSION:Int = 1;

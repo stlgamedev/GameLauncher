@@ -1,6 +1,6 @@
 
 #define VERSION "0.1.0"
-#define BuildRoot "C:\Builds\STLGameLauncher\windows\bin"
+#define BuildRoot "E:\Projects\GameLauncher\export\windows\bin"
 
 
 [Setup]
@@ -10,7 +10,7 @@ AppVersion={#VERSION}
 AppPublisher=STLGameDev
 DefaultDirName={autopf}\STLGameLauncher
 DefaultGroupName=STLGameLauncher
-OutputDir=C:\Builds\STLGameLauncher\
+OutputDir=E:\Projects\GameLauncher\Builds
 OutputBaseFilename=STLGameLauncher-Setup-v{#StringChange(VERSION, ".", "_")}
 Compression=lzma2
 SolidCompression=yes

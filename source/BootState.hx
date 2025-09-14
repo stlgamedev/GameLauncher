@@ -1,10 +1,27 @@
+import util.GameIndex;
 #if sys
 import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
 #end
+
+import flixel.FlxSprite;
+import flixel.FlxG;
+import flixel.util.FlxColor;
+import openfl.Assets;
+import util.Paths;
+import util.Globals;
+import util.GameEntry;
+import util.Logger;
+import util.Config;
 import util.UpdateSubState;
+import util.CartBake;
+import util.Analytics;
+import util.InputMap;
+import themes.Theme;
 import flixel.FlxState;
+import flixel.text.FlxText;
+import aseprite.Aseprite;
 
 typedef UpdateNeeded =
 {
@@ -131,7 +148,7 @@ class BootState extends FlxState
 				stepDone("Load theme");
 
 			case 5:
-				// Bake Carts (small, disk-friendly)
+				final frameAbs = Path.join([Globals.theme.dir, "cart_frame.png"]);
 				final frameAbs = HxPath.join([Globals.theme.dir, "cart_frame.png"]);
 				// Log only if cart frame is missing
 				CartBake.TARGET_WIDTH = 200; // tweakable
