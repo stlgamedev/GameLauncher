@@ -2,10 +2,6 @@ name: Build and Release Windows Installer
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (optional, will use Project.xml if blank)'
-        required: false
 
 jobs:
   build:
@@ -24,7 +20,8 @@ jobs:
         run: |
           haxelib install openfl
           haxelib install flixel
-          # Add any other haxelibs you use
+          haxelib install openfl-aseprite
+          haxelib install hxcodec
 
       # Sync version from Project.xml to STLGameLauncher.iss
       - name: Sync version to .iss
