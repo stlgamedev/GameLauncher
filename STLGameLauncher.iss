@@ -1,4 +1,3 @@
-
 #define VERSION "0.1.0"
 #define BuildRoot "E:\Projects\GameLauncher\export\windows\bin"
 
@@ -19,7 +18,7 @@ ArchitecturesInstallIn64BitMode=x64
 MinVersion=10.0.0
 ; Ensure the install location prompt is shown
 ; Do NOT set DisableDirPage=yes (leave it out or set to no)
-;DisableDirPage=no
+DisableDirPage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -37,6 +36,8 @@ Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "A
 
 [Run]
 Filename: "{app}\STLGameLauncher.exe"; Description: "Launch STLGameLauncher"; Flags: nowait postinstall skipifsilent
+Filename: "schtasks.exe"; Parameters: "/Create /F /RL HIGHEST /SC ONLOGON /TN \"STLGameLauncherKiosk\" /TR '""{app}\STLGameLauncher.exe"" --kiosk'"; StatusMsg: "Registering kiosk auto-start..."; Flags: runhidden
+Filename: "powershell.exe"; Parameters: "-Command \"Try { Get-ScheduledTask -TaskName 'STLGameLauncherKiosk' | Set-ScheduledTask -Settings (New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)) } Catch { }\""; StatusMsg: "Configuring kiosk task restart-on-failure..."; Flags: runhidden
 
 [Code]
 var
@@ -143,8 +144,8 @@ begin
   CheckUpdateOnLaunch.Parent := PageUpdate.Surface;
   CheckUpdateOnLaunch.Top := L.Top + L.Height + 4;
   CheckUpdateOnLaunch.Left := 16;
-  CheckUpdateOnLaunch.Width := 320;
-  CheckUpdateOnLaunch.Caption := 'Check for updates when the application launches';
+  CheckUpdateOnLaunch.Width := 400; // Increased width for clarity
+  CheckUpdateOnLaunch.Caption := 'Check for updates at launch'; // Shorter caption to avoid truncation
   CheckUpdateOnLaunch.Checked := True;
 
   L := TLabel.Create(PageUpdate);
@@ -177,17 +178,18 @@ end;
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   IniPath, Mode, Subscription, ContentRoot, LogsRoot, IdleMenu, IdleGame, UpdateOnLaunch, ServerBase, IniText: string;
+  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
-    IniPath := ExpandConstant('{app}\\settings.cfg');
+    IniPath := ExpandConstant('{app}\settings.cfg');
     if RadioModeKiosk.Checked then Mode := 'kiosk' else Mode := 'normal';
     Subscription := Trim(EditSubscription.Text);
     if Subscription = '' then Subscription := 'arcade-jam-2018';
     ContentRoot := Trim(EditContentRoot.Text);
-    if ContentRoot = '' then ContentRoot := ExpandConstant('{commonappdata}\\STLGameLauncher\\external');
+    if ContentRoot = '' then ContentRoot := ExpandConstant('{commonappdata}\STLGameLauncher\external');
     LogsRoot := Trim(EditLogsRoot.Text);
-    if LogsRoot = '' then LogsRoot := ExpandConstant('{commonappdata}\\STLGameLauncher\\logs');
+    if LogsRoot = '' then LogsRoot := ExpandConstant('{commonappdata}\STLGameLauncher\logs');
     IdleMenu := Trim(EditIdleMenu.Text); if IdleMenu = '' then IdleMenu := '180';
     IdleGame := Trim(EditIdleGame.Text); if IdleGame = '' then IdleGame := '300';
     if CheckUpdateOnLaunch.Checked then
@@ -211,5 +213,9 @@ begin
       'server_base = ' + ServerBase + #13#10;
 
     SaveStringToFile(IniPath, IniText, False);
+
+    // Always create the task, but disable it if not kiosk mode
+    if Mode <> 'kiosk' then
+      Exec('schtasks.exe', '/Change /TN "STLGameLauncherKiosk" /DISABLE', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;

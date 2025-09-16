@@ -5,25 +5,55 @@ import flixel.FlxGame;
 import flixel.FlxState;
 import BootState;
 import UpdateOnlyState;
+#if sys
+import util.Globals;
+#end
 
 class Main extends Sprite
 {
 	public function new()
 	{
-		super();
+		try
+		{
+			super();
 
-		var wantUpdate = false;
-		#if sys
-		for (a in Sys.args())
-			if (a == "--update")
+			var wantUpdate = false;
+			#if sys
+			for (a in Sys.args())
+				if (a == "--update")
+				{
+					wantUpdate = true;
+					break;
+				}
+			#end
+
+			var initState:Class<flixel.FlxState> = wantUpdate ? UpdateOnlyState : BootState;
+
+			addChild(new flixel.FlxGame(1920, 1080, initState, 60, 60, true));
+		}
+		catch (e:Dynamic)
+		{
+			#if sys
+			// Log the error and stack trace before restarting
+			try
 			{
-				wantUpdate = true;
-				break;
+				if (Globals.log != null)
+				{
+					Globals.log.line('[FATAL] Unhandled exception: ' + Std.string(e));
+					var stack = haxe.CallStack.exceptionStack();
+					if (stack != null && stack.length > 0)
+					{
+						for (frame in stack)
+						{
+							Globals.log.line('  ' + haxe.CallStack.toString([frame]));
+						}
+					}
+				}
 			}
-		#end
-
-		var initState:Class<flixel.FlxState> = wantUpdate ? UpdateOnlyState : BootState;
-
-		addChild(new flixel.FlxGame(1920, 1080, initState, 60, 60, true));
+			catch (_:Dynamic) {}
+			Sys.println('Launcher crashed, restarting...');
+			Sys.command(Sys.programPath(), Sys.args());
+			#end
+		}
 	}
 }

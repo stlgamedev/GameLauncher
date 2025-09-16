@@ -52,6 +52,11 @@ class LaunchState extends FlxState
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
 
+#if windows
+		// Set always on top for the launcher window
+		setAlwaysOnTop(true);
+#end
+
 		// --- Box art centered (fit ~80% of screen) ---
 		splash = new flixel.FlxSprite();
 		var boxPath = game.box;
@@ -83,6 +88,9 @@ class LaunchState extends FlxState
 			idleTimeout = Globals.cfg.idleSecondsGame;
 
 		// Start process + monitors
+#if windows
+		setAlwaysOnTop(false); // Remove always on top before launching game
+#end
 		launchGameAsync();
 		#if (windows && cpp)
 		initXInputOptional();
@@ -108,6 +116,9 @@ class LaunchState extends FlxState
 	{
 		var secs = Math.max(0, (Date.now().getTime() - startTimeMs) / 1000.0);
 		util.Analytics.recordSession(game.id, secs);
+#if windows
+		setAlwaysOnTop(true); // Restore always on top after game exits
+#end
 		FlxG.switchState(() -> new GameSelectState());
 	}
 
@@ -415,4 +426,22 @@ class LaunchState extends FlxState
 		return false;
 	}
 	#end
+
+#if windows
+// Helper to set the window always on top (Windows only)
+function setAlwaysOnTop(enable:Bool):Void {
+	var hwnd = getHWND();
+	if (hwnd != null) {
+		untyped __cpp__('SetWindowPos((HWND){0}, enable ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);', hwnd, enable);
+	}
+}
+
+// Helper to get the HWND for the OpenFL window
+function getHWND():Dynamic {
+	try {
+		return untyped __cpp__('(HWND)FindWindowA(NULL, "{0}")', Lib.application.window.title);
+	} catch (_:Dynamic) {}
+	return null;
+}
+#end
 }
