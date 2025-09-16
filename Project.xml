@@ -22,8 +22,6 @@
 	<haxelib name="openfl-aseprite" />
 	<haxelib name="hxCodec" />
 
-	 
-
 	<haxedef name="FLX_NO_HEALTH" />
 
 	<haxedef name="FLX_NO_FOCUS_LOST_SCREEN" />
