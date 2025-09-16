@@ -1,6 +1,5 @@
 #define VERSION "0.1.0"
-#define BuildRoot "E:\Projects\GameLauncher\export\windows\bin"
-
+#define BuildRoot "export\\windows\\bin"
 
 [Setup]
 AppId=STLGameLauncher

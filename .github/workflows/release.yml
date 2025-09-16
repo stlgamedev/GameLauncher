@@ -1,0 +1,68 @@
+name: Build and Release Windows Installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (optional, will use Project.xml if blank)'
+        required: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # Install Haxe
+      - name: Install Haxe
+        uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.3
+
+      # Install dependencies
+      - name: Install haxelibs
+        run: |
+          haxelib install openfl
+          haxelib install flixel
+          # Add any other haxelibs you use
+
+      # Sync version from Project.xml to STLGameLauncher.iss
+      - name: Sync version to .iss
+        run: python scripts/update_iss_version.py Project.xml STLGameLauncher.iss
+
+      # Build Windows executable
+      - name: Build Windows Executable
+        run: haxelib run lime build windows -release
+
+      # Install Inno Setup
+      - name: Install Inno Setup
+        run: choco install innosetup
+
+      # Build installer
+      - name: Build Installer
+        run: ISCC.exe STLGameLauncher.iss
+
+      # Find the installer exe
+      - name: Find installer
+        id: find_installer
+        run: |
+          $file = Get-ChildItem -Path Builds -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          echo "INSTALLER_PATH=$($file.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # Upload to GitHub Releases
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ env.INSTALLER_PATH }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Deploy to NearlyFreeSpeech via SFTP
+      - name: Deploy to NearlyFreeSpeech
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: ${{ env.INSTALLER_PATH }}
+          target: /home/public 
