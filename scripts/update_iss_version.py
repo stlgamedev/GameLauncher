@@ -6,10 +6,14 @@ import xml.etree.ElementTree as ET
 def get_version_from_projectxml(projectxml_path):
     tree = ET.parse(projectxml_path)
     root = tree.getroot()
-    version = root.attrib.get('version')
+    # Try to get version from <app> tag
+    app_tag = root.find('.//{*}app')
+    version = None
+    if app_tag is not None:
+        version = app_tag.attrib.get('version')
     if not version:
         # Try to find <version> tag
-        version_tag = root.find('version')
+        version_tag = root.find('.//{*}version')
         if version_tag is not None:
             version = version_tag.text.strip()
     if not version:
