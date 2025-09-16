@@ -11,11 +11,18 @@ import sys.FileSystem;
 import sys.io.Process;
 import sys.thread.Thread;
 import util.InputMap.Action;
+import util.WinAPI;
 
 // Include WinAPI headers when compiling for Windows C++
+
 #if (windows && cpp)
 import cpp.NativeArray;
 @:cppFileCode('#include <Windows.h>\n#include <Xinput.h>')
+@:cppInclude("Windows.h")
+extern class WinAPI {
+	@:native("FindWindowA")
+	static function FindWindowA(className:cpp.ConstCharStar, windowName:cpp.ConstCharStar):cpp.Pointer<cpp.Void>;
+}
 #end
 
 class LaunchState extends FlxState
@@ -74,6 +81,7 @@ class LaunchState extends FlxState
 		// --- Spinner (same asset/placement as BootState) ---
 		try {
 			var bytes = Assets.getBytes("assets/images/spinning_icon.aseprite");
+			
 			logo = Aseprite.fromBytes(bytes);
 			logo.play();
 			logo.mouseEnabled = logo.mouseChildren = false;
@@ -436,12 +444,18 @@ function setAlwaysOnTop(enable:Bool):Void {
 	}
 }
 
+
+
 // Helper to get the HWND for the OpenFL window
 function getHWND():Dynamic {
+#if (windows && cpp)
 	try {
-		return untyped __cpp__('(HWND)FindWindowA(NULL, "{0}")', Lib.application.window.title);
+		return WinAPI.FindWindowA(null, Std.string(openfl.Lib.application.window.title));
 	} catch (_:Dynamic) {}
 	return null;
+#else
+	return null;
+#end
 }
 #end
 }
