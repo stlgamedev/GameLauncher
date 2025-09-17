@@ -6,10 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      ref:
-        description: 'Git ref (branch or tag) to build'
-        required: true
-        default: 'main'
+      tag:
+        description: 'Tag to build and release (e.g., v1.0.0) [leave blank for dev build only]'
+        required: false
 
 jobs:
   build:
@@ -17,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.inputs.ref }}
+          ref: ${{ github.event.inputs.tag || github.ref_name || 'main' }}
 
       # Install Haxe
       - name: Install Haxe
@@ -57,31 +56,47 @@ jobs:
           $file = Get-ChildItem -Path Builds -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
           echo "INSTALLER_PATH=$($file.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      # Upload to GitHub Releases
+      # Upload as artifact if not a release build
+      - name: Upload Installer Artifact
+        if: ${{ !github.event.inputs.tag && !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: STLGameLauncher-Setup
+          path: ${{ env.INSTALLER_PATH }}
+
+      # Upload to GitHub Releases (only if running on a tag)
       - name: Upload Release Asset
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         uses: softprops/action-gh-release@v1
         with:
           files: ${{ env.INSTALLER_PATH }}
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
+      # Download WinSCP Portable (only for release builds)
       - name: Download WinSCP Portable
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         run: |
           Invoke-WebRequest -Uri "https://winscp.net/download/WinSCP-6.3.3-Portable.zip" -OutFile "WinSCP.zip"
           Expand-Archive WinSCP.zip -DestinationPath WinSCP
       
+      # Prepare WinSCP Script (only for release builds)
       - name: Prepare WinSCP Script
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         run: |
           $script = @"
           option batch abort
           option confirm off
           open sftp://${{ secrets.SFTP_USER }}:${{ secrets.SFTP_PASSWORD }}@${{ secrets.SFTP_HOST }}
           rm /home/public/STLGameLauncher-Setup-*.exe
-          put ""${{ env.INSTALLER_PATH }}"" /home/public/
+          put \"${{ env.INSTALLER_PATH }}\" /home/public/
           exit
           "@
           $script | Set-Content -Path deploy_script.txt
       
+      # Deploy installer with WinSCP (only for release builds)
       - name: Deploy installer with WinSCP
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         run: |
           .\WinSCP\WinSCP.com /script=deploy_script.txt
