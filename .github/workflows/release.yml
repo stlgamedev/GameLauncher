@@ -57,13 +57,24 @@ jobs:
           files: ${{ env.INSTALLER_PATH }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Deploy to NearlyFreeSpeech via SFTP
-      - name: Deploy to NearlyFreeSpeech
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SFTP_HOST }}
-          username: ${{ secrets.SFTP_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: ${{ env.INSTALLER_PATH }}
-          target: /home/public 
+          
+      - name: Download WinSCP Portable
+        run: |
+          Invoke-WebRequest -Uri "https://winscp.net/download/WinSCP-6.3.3-Portable.zip" -OutFile "WinSCP.zip"
+          Expand-Archive WinSCP.zip -DestinationPath WinSCP
+      
+      - name: Prepare WinSCP Script
+        run: |
+          $script = @"
+          option batch abort
+          option confirm off
+          open sftp://${{ secrets.SFTP_USER }}:${{ secrets.SFTP_PASSWORD }}@${{ secrets.SFTP_HOST }}
+          rm /home/public/STLGameLauncher-Setup-*.exe
+          put ""${{ env.INSTALLER_PATH }}"" /home/public/
+          exit
+          "@
+          $script | Set-Content -Path deploy_script.txt
+      
+      - name: Deploy installer with WinSCP
+        run: |
+          .\WinSCP\WinSCP.com /script=deploy_script.txt
