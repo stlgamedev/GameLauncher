@@ -35,9 +35,7 @@ Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "A
 
 [Run]
 Filename: "{app}\STLGameLauncher.exe"; Description: "Launch STLGameLauncher"; Flags: nowait postinstall skipifsilent
-Filename: "schtasks.exe"; \
-  Parameters: '/Create /F /RL HIGHEST /SC ONLOGON /TN "STLGameLauncherKiosk" /TR "{app}\STLGameLauncher.exe --kiosk"'; \
-  StatusMsg: "Registering kiosk auto-start..."; Flags: runhidden
+Filename: "schtasks.exe"; Parameters: '/Create /F /RL HIGHEST /SC ONLOGON /TN "STLGameLauncherKiosk" /TR "{app}\STLGameLauncher.exe --kiosk"'; StatusMsg: "Registering kiosk auto-start..."; Flags: runhidden
 Filename: "powershell.exe"; Parameters: "-Command \"Try { Get-ScheduledTask -TaskName 'STLGameLauncherKiosk' | Set-ScheduledTask -Settings (New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)) } Catch { }\""; StatusMsg: "Configuring kiosk task restart-on-failure..."; Flags: runhidden
 
 [Code]
