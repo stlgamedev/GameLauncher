@@ -74,13 +74,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Download WinSCP Portable (only for release builds)
-      - name: Download WinSCP Portable
+      # Install WinSCP Portable (only for release builds)
+      - name: Install WinSCP Portable
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          Invoke-WebRequest -Uri "https://winscp.net/download/WinSCP-6.3.3-Portable.zip" -OutFile "WinSCP.zip"
-          Expand-Archive WinSCP.zip -DestinationPath WinSCP
-      
+        run: choco install winscp.portable -y
+
       # Prepare WinSCP Script (only for release builds)
       - name: Prepare WinSCP Script
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
@@ -94,9 +92,10 @@ jobs:
           exit
           "@
           $script | Set-Content -Path deploy_script.txt
-      
+
       # Deploy installer with WinSCP (only for release builds)
       - name: Deploy installer with WinSCP
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         run: |
-          .\WinSCP\WinSCP.com /script=deploy_script.txt
+          $winscp = (Get-Command winscp.com).Source
+          & $winscp /script=deploy_script.txt
