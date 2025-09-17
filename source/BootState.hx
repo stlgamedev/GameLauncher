@@ -4,7 +4,6 @@ import haxe.io.Path;
 import sys.FileSystem;
 import sys.io.File;
 #end
-
 import flixel.FlxSprite;
 import flixel.FlxG;
 import flixel.util.FlxColor;
@@ -42,9 +41,6 @@ class BootState extends FlxState
 
 	override public function create():Void
 	{
-#if windows
-		setAlwaysOnTop(true);
-#end
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
 		FlxG.mouse.visible = FlxG.mouse.enabled = false;
@@ -104,9 +100,9 @@ class BootState extends FlxState
 					Log.line("[BOOT][ERROR] No config found, created default.");
 					Sys.exit(1);
 				}
-#if sys
+				#if sys
 				syncKioskScheduledTask(Globals.cfg.mode);
-#end
+				#end
 				util.InputMap.inst.configure(Globals.cfg.controlsKeys, Globals.cfg.controlsPads);
 				// Log only if config is missing or invalid
 
@@ -240,34 +236,20 @@ class BootState extends FlxState
 		super.destroy();
 	}
 
-#if sys
-function syncKioskScheduledTask(mode:String):Void {
-	var taskName = "STLGameLauncherKiosk";
-	var enableCmd = 'schtasks.exe /Change /TN "' + taskName + '" /ENABLE';
-	var disableCmd = 'schtasks.exe /Change /TN "' + taskName + '" /DISABLE';
-	if (mode == "kiosk") {
-		Sys.command(enableCmd);
-	} else {
-		Sys.command(disableCmd);
+	#if sys
+	function syncKioskScheduledTask(mode:String):Void
+	{
+		var taskName = "STLGameLauncherKiosk";
+		var enableCmd = 'schtasks.exe /Change /TN "' + taskName + '" /ENABLE';
+		var disableCmd = 'schtasks.exe /Change /TN "' + taskName + '" /DISABLE';
+		if (mode == "kiosk")
+		{
+			Sys.command(enableCmd);
+		}
+		else
+		{
+			Sys.command(disableCmd);
+		}
 	}
-}
-#end
-
-#if windows
-// Helper to set the window always on top (Windows only)
-function setAlwaysOnTop(enable:Bool):Void {
-	var hwnd = getHWND();
-	if (hwnd != null) {
-		untyped __cpp__('SetWindowPos((HWND){0}, enable ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);', hwnd, enable);
-	}
-}
-
-// Helper to get the HWND for the OpenFL window
-function getHWND():Dynamic {
-	try {
-		return untyped __cpp__('(HWND)FindWindowA(NULL, "{0}")', openfl.Lib.application.window.title);
-	} catch (_:Dynamic) {}
-	return null;
-}
-#end
+	#end
 }

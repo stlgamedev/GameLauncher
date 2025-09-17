@@ -11,18 +11,11 @@ import sys.FileSystem;
 import sys.io.Process;
 import sys.thread.Thread;
 import util.InputMap.Action;
-import util.WinAPI;
 
 // Include WinAPI headers when compiling for Windows C++
-
 #if (windows && cpp)
 import cpp.NativeArray;
 @:cppFileCode('#include <Windows.h>\n#include <Xinput.h>')
-@:cppInclude("Windows.h")
-extern class WinAPI {
-	@:native("FindWindowA")
-	static function FindWindowA(className:cpp.ConstCharStar, windowName:cpp.ConstCharStar):cpp.Pointer<cpp.Void>;
-}
 #end
 
 class LaunchState extends FlxState
@@ -59,11 +52,6 @@ class LaunchState extends FlxState
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
 
-#if windows
-		// Set always on top for the launcher window
-		setAlwaysOnTop(true);
-#end
-
 		// --- Box art centered (fit ~80% of screen) ---
 		splash = new flixel.FlxSprite();
 		var boxPath = game.box;
@@ -81,7 +69,6 @@ class LaunchState extends FlxState
 		// --- Spinner (same asset/placement as BootState) ---
 		try {
 			var bytes = Assets.getBytes("assets/images/spinning_icon.aseprite");
-			
 			logo = Aseprite.fromBytes(bytes);
 			logo.play();
 			logo.mouseEnabled = logo.mouseChildren = false;
@@ -96,9 +83,6 @@ class LaunchState extends FlxState
 			idleTimeout = Globals.cfg.idleSecondsGame;
 
 		// Start process + monitors
-#if windows
-		setAlwaysOnTop(false); // Remove always on top before launching game
-#end
 		launchGameAsync();
 		#if (windows && cpp)
 		initXInputOptional();
@@ -124,9 +108,6 @@ class LaunchState extends FlxState
 	{
 		var secs = Math.max(0, (Date.now().getTime() - startTimeMs) / 1000.0);
 		util.Analytics.recordSession(game.id, secs);
-#if windows
-		setAlwaysOnTop(true); // Restore always on top after game exits
-#end
 		FlxG.switchState(() -> new GameSelectState());
 	}
 
@@ -434,28 +415,4 @@ class LaunchState extends FlxState
 		return false;
 	}
 	#end
-
-#if windows
-// Helper to set the window always on top (Windows only)
-function setAlwaysOnTop(enable:Bool):Void {
-	var hwnd = getHWND();
-	if (hwnd != null) {
-		untyped __cpp__('SetWindowPos((HWND){0}, enable ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);', hwnd, enable);
-	}
-}
-
-
-
-// Helper to get the HWND for the OpenFL window
-function getHWND():Dynamic {
-#if (windows && cpp)
-	try {
-		return WinAPI.FindWindowA(null, Std.string(openfl.Lib.application.window.title));
-	} catch (_:Dynamic) {}
-	return null;
-#else
-	return null;
-#end
-}
-#end
 }
