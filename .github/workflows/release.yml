@@ -127,21 +127,20 @@ jobs:
 
 
 
-          # Find the first non-comment line (actual key) in hostkey.txt
-          KEYLINE=$(grep -v '^#' hostkey.txt | head -n 1)
-          if echo "$KEYLINE" | grep -q 'ssh-ed25519'; then
-            KEYTYPE="ssh-ed25519"
-          elif echo "$KEYLINE" | grep -q 'ecdsa'; then
-            KEYTYPE="ecdsa-sha2-nistp256"
-          elif echo "$KEYLINE" | grep -q 'ssh-rsa'; then
-            KEYTYPE="ssh-rsa"
-          else
-            echo "ERROR: Unknown key type in hostkey.txt: $KEYLINE"
+          # Always prefer ed25519, then ecdsa, then rsa for PuTTY host key
+          KEYLINE=$(grep -v '^#' hostkey.txt | grep 'ssh-ed25519' | head -n 1)
+          if [ -z "$KEYLINE" ]; then
+            KEYLINE=$(grep -v '^#' hostkey.txt | grep 'ecdsa' | head -n 1)
+          fi
+          if [ -z "$KEYLINE" ]; then
+            KEYLINE=$(grep -v '^#' hostkey.txt | grep 'ssh-rsa' | head -n 1)
+          fi
+          if [ -z "$KEYLINE" ]; then
+            echo "ERROR: Could not find a supported host key type (ed25519, ecdsa, rsa) in hostkey.txt"
             cat hostkey.txt
             exit 1
           fi
 
-          # Extract the key type and base64 key, join with colon for PuTTY format
           KEYTYPE_FIELD=$(echo "$KEYLINE" | awk '{print $1}')
           KEYDATA_FIELD=$(echo "$KEYLINE" | awk '{print $2}')
           PUTTY_HOSTKEY="$KEYTYPE_FIELD:$KEYDATA_FIELD"
