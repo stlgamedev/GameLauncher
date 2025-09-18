@@ -74,98 +74,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Write SFTP batch commands for cleanup
-      - name: Write SFTP batch commands
-        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        shell: pwsh
-        run: |
-          Set-Content -Path putty-sftp-cmds.txt -Value "cd /home/public/`nrm STLGameLauncher-Setup-*.exe`nbye" -NoNewline
-
-      # Write SSH private key to file
-      - name: Write SSH key
-        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        shell: pwsh
-        env:
-          SFTP_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          Set-Content -Path keyfile -Value $env:SFTP_KEY -NoNewline
-
-      # Download and extract PuTTY tools
-      - name: Download PuTTY tools
-        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://the.earth.li/~sgtatham/putty/latest/w64/putty.zip" -OutFile "putty.zip"
-          Expand-Archive -Path "putty.zip" -DestinationPath "putty-tools"
-
-      # Dynamically fetch and cache SFTP host key for PuTTY
-      - name: Cache SFTP host key (dynamic)
+      # Clean old installers and upload new one via OpenSSH (robust, no host key prompt)
+      - name: SFTP Clean and Upload (OpenSSH)
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         shell: bash
-        env:
-          SFTP_HOST: ${{ secrets.SFTP_HOST }}
-        run: |
-          set -e
-          # Ensure plink.exe is available in the working directory
-          if [ -f putty-tools/plink.exe ]; then
-            cp putty-tools/plink.exe .
-          elif [ -f plink.exe ]; then
-            echo "plink.exe already present"
-          else
-            echo "plink.exe not found, downloading..."
-            curl -L -o plink.exe https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
-          fi
-
-          # Fetch all host keys using ssh-keyscan (Git Bash is available on Windows runners)
-          ssh-keyscan "$SFTP_HOST" > hostkey.txt 2>/dev/null
-
-          # Check if hostkey.txt is not empty
-          if [ ! -s hostkey.txt ]; then
-            echo "ERROR: ssh-keyscan failed to fetch host key for $SFTP_HOST"
-            exit 1
-          fi
-
-
-
-          # Always prefer ed25519, then ecdsa, then rsa for PuTTY host key
-          KEYLINE=$(grep -v '^#' hostkey.txt | grep 'ssh-ed25519' | head -n 1)
-          if [ -z "$KEYLINE" ]; then
-            KEYLINE=$(grep -v '^#' hostkey.txt | grep 'ecdsa' | head -n 1)
-          fi
-          if [ -z "$KEYLINE" ]; then
-            KEYLINE=$(grep -v '^#' hostkey.txt | grep 'ssh-rsa' | head -n 1)
-          fi
-          if [ -z "$KEYLINE" ]; then
-            echo "ERROR: Could not find a supported host key type (ed25519, ecdsa, rsa) in hostkey.txt"
-            cat hostkey.txt
-            exit 1
-          fi
-
-          KEYTYPE_FIELD=$(echo "$KEYLINE" | awk '{print $1}')
-          KEYDATA_FIELD=$(echo "$KEYLINE" | awk '{print $2}')
-          PUTTY_HOSTKEY="$KEYTYPE_FIELD:$KEYDATA_FIELD"
-          if [ -z "$KEYTYPE_FIELD" ] || [ -z "$KEYDATA_FIELD" ]; then
-            echo "ERROR: Could not extract PuTTY host key format from: $KEYLINE"
-            cat hostkey.txt
-            exit 1
-          fi
-
-          # Add the host key to PuTTY's cache using plink.exe (must use keytype:base64key format)
-          ./plink.exe -ssh -hostkey "$PUTTY_HOSTKEY" "$SFTP_HOST" exit || true
-
-          # Clean up
-          rm -f hostkey.txt
-
-      # Clean old installers and upload new one via PuTTY tools
-      - name: SFTP Clean and Upload (PuTTY)
-        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        shell: cmd
         env:
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
           INSTALLER_PATH: ${{ env.INSTALLER_PATH }}
+          SFTP_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          putty-tools\psftp.exe -i keyfile -batch -b putty-sftp-cmds.txt %SFTP_USER%@%SFTP_HOST% || exit 1
-          putty-tools\pscp.exe -i keyfile -batch -sftp "%INSTALLER_PATH%" %SFTP_USER%@%SFTP_HOST%:/home/public/ || exit 1
-          del keyfile
-          del putty-sftp-cmds.txt
+          set -e
+          echo "$SFTP_KEY" > keyfile
+          chmod 600 keyfile
+
+          # Remove old installers
+          ssh -i keyfile -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=known_hosts $SFTP_USER@$SFTP_HOST 'rm -f /home/public/STLGameLauncher-Setup-*.exe'
+
+          # Upload new installer
+          scp -i keyfile -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=known_hosts "$INSTALLER_PATH" $SFTP_USER@$SFTP_HOST:/home/public/
+
+          rm -f keyfile known_hosts
