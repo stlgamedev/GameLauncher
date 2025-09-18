@@ -98,7 +98,7 @@ jobs:
           $secureKey = $env:SFTP_KEY | ConvertTo-SecureString -AsPlainText -Force
           Set-Content -Path $key -Value $secureKey -Force -ErrorAction Stop
           Install-Module -Name Posh-SSH -Force -Scope CurrentUser -ErrorAction Stop
-          $session = New-SFTPSession -ComputerName $env:SFTP_HOST -Username $env:SFTP_USER -KeyFile $key -AcceptKey -ErrorAction Stop
+          $session = New-SFTPSession -ComputerName $env:SFTP_HOST -UserName $env:SFTP_USER -KeyFile $key -AcceptKey -ErrorAction Stop
           # Remove all old installers
           Get-SFTPChildItem -SessionId $session.SessionId -Path '/home/public/' | Where-Object { $_.Name -like 'STLGameLauncher-Setup-*.exe' } | ForEach-Object { Remove-SFTPItem -SessionId $session.SessionId -Path $_.FullName -ErrorAction Stop }
           # Upload the new installer
