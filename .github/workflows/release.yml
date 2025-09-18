@@ -116,8 +116,8 @@ jobs:
             curl -L -o plink.exe https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
           fi
 
-          # Fetch the host key using ssh-keyscan (Git Bash is available on Windows runners)
-          ssh-keyscan -t rsa "$SFTP_HOST" > hostkey.txt 2>/dev/null
+          # Fetch all host keys using ssh-keyscan (Git Bash is available on Windows runners)
+          ssh-keyscan "$SFTP_HOST" > hostkey.txt 2>/dev/null
 
           # Check if hostkey.txt is not empty
           if [ ! -s hostkey.txt ]; then
@@ -125,10 +125,24 @@ jobs:
             exit 1
           fi
 
-          # Extract the fingerprint in the format PuTTY expects (SHA256)
-          FINGERPRINT=$(ssh-keygen -l -f hostkey.txt | grep RSA | awk '{print $2}')
+          # Find the key type actually used by the server (prefer ed25519, then ecdsa, then rsa)
+          KEYLINE=$(head -n 1 hostkey.txt)
+          if echo "$KEYLINE" | grep -q 'ssh-ed25519'; then
+            KEYTYPE="ed25519"
+          elif echo "$KEYLINE" | grep -q 'ecdsa'; then
+            KEYTYPE="ecdsa"
+          elif echo "$KEYLINE" | grep -q 'ssh-rsa'; then
+            KEYTYPE="rsa"
+          else
+            echo "ERROR: Unknown key type in hostkey.txt: $KEYLINE"
+            cat hostkey.txt
+            exit 1
+          fi
+
+          # Extract the fingerprint for the detected key type
+          FINGERPRINT=$(ssh-keygen -l -f hostkey.txt | grep -i "$KEYTYPE" | awk '{print $2}')
           if [ -z "$FINGERPRINT" ]; then
-            echo "ERROR: Could not extract fingerprint from hostkey.txt"
+            echo "ERROR: Could not extract fingerprint for $KEYTYPE from hostkey.txt"
             cat hostkey.txt
             exit 1
           fi
