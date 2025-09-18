@@ -74,28 +74,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Install WinSCP Portable (only for release builds)
-      - name: Install WinSCP Portable
+      # Install Posh-SSH PowerShell module
+      - name: Install Posh-SSH
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        run: choco install winscp.portable -y
+        shell: pwsh
+        run: Install-Module -Name Posh-SSH -Force -Scope CurrentUser
 
-      # Prepare WinSCP Script (only for release builds)
-      - name: Prepare WinSCP Script
+      # Delete old installers and upload new one via SFTP
+      - name: SFTP Clean and Upload
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
+        shell: pwsh
+        env:
+          SFTP_USER: ${{ secrets.SFTP_USER }}
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          INSTALLER_PATH: ${{ env.INSTALLER_PATH }}
         run: |
-          $script = @"
-          option batch abort
-          option confirm off
-          open sftp://${{ secrets.SFTP_USER }}:${{ secrets.SFTP_PASSWORD }}@${{ secrets.SFTP_HOST }}
-          rm /home/public/STLGameLauncher-Setup-*.exe
-          put \"${{ env.INSTALLER_PATH }}\" /home/public/
-          exit
-          "@
-          $script | Set-Content -Path deploy_script.txt
-
-      # Deploy installer with WinSCP (only for release builds)
-      - name: Deploy installer with WinSCP
-        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          $winscp = (Get-Command winscp.com).Source
-          & $winscp /script=deploy_script.txt
+          if (-not (Test-Path $env:INSTALLER_PATH)) {
+            Write-Error "Installer not found: $env:INSTALLER_PATH"
+            exit 1
+          }
+          $key = [System.IO.Path]::GetTempFileName()
+          $secureKey = $env:SFTP_KEY | ConvertTo-SecureString -AsPlainText -Force
+          Set-Content -Path $key -Value $secureKey -Force -ErrorAction Stop
+          Install-Module -Name Posh-SSH -Force -Scope CurrentUser -ErrorAction Stop
+          $session = New-SFTPSession -ComputerName $env:SFTP_HOST -Username $env:SFTP_USER -KeyFile $key -AcceptKey -ErrorAction Stop
+          # Remove all old installers
+          Get-SFTPChildItem -SessionId $session.SessionId -Path '/home/public/' | Where-Object { $_.Name -like 'STLGameLauncher-Setup-*.exe' } | ForEach-Object { Remove-SFTPItem -SessionId $session.SessionId -Path $_.FullName -ErrorAction Stop }
+          # Upload the new installer
+          Set-SFTPFile -SessionId $session.SessionId -LocalFile $env:INSTALLER_PATH -RemotePath '/home/public/' -ErrorAction Stop
+          Remove-SFTPSession -SessionId $session.SessionId -ErrorAction Stop
+          Remove-Item $key -Force -ErrorAction Stop
