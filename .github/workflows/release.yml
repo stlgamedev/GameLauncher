@@ -74,34 +74,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Install Posh-SSH PowerShell module
-      - name: Install Posh-SSH
+      # Write SFTP batch commands for cleanup
+      - name: Write SFTP batch commands
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         shell: pwsh
-        run: Install-Module -Name Posh-SSH -Force -Scope CurrentUser
+        run: |
+          Set-Content -Path putty-sftp-cmds.txt -Value "cd /home/public/`nrm STLGameLauncher-Setup-*.exe`nbye" -NoNewline
 
-      # Delete old installers and upload new one via SFTP
-      - name: SFTP Clean and Upload
+      # Write SSH private key to file
+      - name: Write SSH key
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         shell: pwsh
         env:
+          SFTP_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          Set-Content -Path keyfile -Value $env:SFTP_KEY -NoNewline
+
+      # Download and extract PuTTY tools
+      - name: Download PuTTY tools
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://the.earth.li/~sgtatham/putty/latest/w64/putty.zip" -OutFile "putty.zip"
+          Expand-Archive -Path "putty.zip" -DestinationPath "putty-tools"
+
+      # Clean old installers and upload new one via PuTTY tools
+      - name: SFTP Clean and Upload (PuTTY)
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
+        shell: cmd
+        env:
           SFTP_USER: ${{ secrets.SFTP_USER }}
           SFTP_HOST: ${{ secrets.SFTP_HOST }}
-          SFTP_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           INSTALLER_PATH: ${{ env.INSTALLER_PATH }}
         run: |
-          if (-not (Test-Path $env:INSTALLER_PATH)) {
-            Write-Error "Installer not found: $env:INSTALLER_PATH"
-            exit 1
-          }
-          $key = [System.IO.Path]::GetTempFileName()
-          $secureKey = $env:SFTP_KEY | ConvertTo-SecureString -AsPlainText -Force
-          Set-Content -Path $key -Value $secureKey -Force -ErrorAction Stop
-          Install-Module -Name Posh-SSH -Force -Scope CurrentUser -ErrorAction Stop
-          $session = New-SFTPSession -ComputerName $env:SFTP_HOST -UserName $env:SFTP_USER -KeyFile $key -AcceptKey -ErrorAction Stop
-          # Remove all old installers
-          Get-SFTPChildItem -SessionId $session.SessionId -Path '/home/public/' | Where-Object { $_.Name -like 'STLGameLauncher-Setup-*.exe' } | ForEach-Object { Remove-SFTPItem -SessionId $session.SessionId -Path $_.FullName -ErrorAction Stop }
-          # Upload the new installer
-          Set-SFTPFile -SessionId $session.SessionId -LocalFile $env:INSTALLER_PATH -RemotePath '/home/public/' -ErrorAction Stop
-          Remove-SFTPSession -SessionId $session.SessionId -ErrorAction Stop
-          Remove-Item $key -Force -ErrorAction Stop
+          putty-tools\psftp.exe -i keyfile -batch -b putty-sftp-cmds.txt %SFTP_USER%@%SFTP_HOST% || exit 1
+          putty-tools\pscp.exe -i keyfile -batch -sftp "%INSTALLER_PATH%" %SFTP_USER%@%SFTP_HOST%:/home/public/ || exit 1
+          del keyfile
+          del putty-sftp-cmds.txt
