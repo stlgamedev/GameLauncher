@@ -98,6 +98,47 @@ jobs:
           Invoke-WebRequest -Uri "https://the.earth.li/~sgtatham/putty/latest/w64/putty.zip" -OutFile "putty.zip"
           Expand-Archive -Path "putty.zip" -DestinationPath "putty-tools"
 
+      # Dynamically fetch and cache SFTP host key for PuTTY
+      - name: Cache SFTP host key (dynamic)
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+        run: |
+          set -e
+          # Ensure plink.exe is available in the working directory
+          if [ -f putty-tools/plink.exe ]; then
+            cp putty-tools/plink.exe .
+          elif [ -f plink.exe ]; then
+            echo "plink.exe already present"
+          else
+            echo "plink.exe not found, downloading..."
+            curl -L -o plink.exe https://the.earth.li/~sgtatham/putty/latest/w64/plink.exe
+          fi
+
+          # Fetch the host key using ssh-keyscan (Git Bash is available on Windows runners)
+          ssh-keyscan -t rsa "$SFTP_HOST" > hostkey.txt 2>/dev/null
+
+          # Check if hostkey.txt is not empty
+          if [ ! -s hostkey.txt ]; then
+            echo "ERROR: ssh-keyscan failed to fetch host key for $SFTP_HOST"
+            exit 1
+          fi
+
+          # Extract the fingerprint in the format PuTTY expects (SHA256)
+          FINGERPRINT=$(ssh-keygen -l -f hostkey.txt | grep RSA | awk '{print $2}')
+          if [ -z "$FINGERPRINT" ]; then
+            echo "ERROR: Could not extract fingerprint from hostkey.txt"
+            cat hostkey.txt
+            exit 1
+          fi
+
+          # Add the host key to PuTTY's cache using plink.exe
+          ./plink.exe -ssh -hostkey "$FINGERPRINT" "$SFTP_HOST" exit || true
+
+          # Clean up
+          rm -f hostkey.txt
+
       # Clean old installers and upload new one via PuTTY tools
       - name: SFTP Clean and Upload (PuTTY)
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
