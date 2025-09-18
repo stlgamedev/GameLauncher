@@ -141,16 +141,18 @@ jobs:
             exit 1
           fi
 
-          # Extract the full key string for the detected key type
-          FULLKEY=$(grep -v '^#' hostkey.txt | grep "$KEYTYPE" | head -n 1 | awk '{print $1 " " $2}')
-          if [ -z "$FULLKEY" ]; then
-            echo "ERROR: Could not extract full key for $KEYTYPE from hostkey.txt"
+          # Extract the key type and base64 key, join with colon for PuTTY format
+          KEYTYPE_FIELD=$(echo "$KEYLINE" | awk '{print $1}')
+          KEYDATA_FIELD=$(echo "$KEYLINE" | awk '{print $2}')
+          PUTTY_HOSTKEY="$KEYTYPE_FIELD:$KEYDATA_FIELD"
+          if [ -z "$KEYTYPE_FIELD" ] || [ -z "$KEYDATA_FIELD" ]; then
+            echo "ERROR: Could not extract PuTTY host key format from: $KEYLINE"
             cat hostkey.txt
             exit 1
           fi
 
-          # Add the host key to PuTTY's cache using plink.exe (must use full key string, not fingerprint)
-          ./plink.exe -ssh -hostkey "$FULLKEY" "$SFTP_HOST" exit || true
+          # Add the host key to PuTTY's cache using plink.exe (must use keytype:base64key format)
+          ./plink.exe -ssh -hostkey "$PUTTY_HOSTKEY" "$SFTP_HOST" exit || true
 
           # Clean up
           rm -f hostkey.txt
