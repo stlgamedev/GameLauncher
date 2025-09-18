@@ -126,30 +126,31 @@ jobs:
           fi
 
 
+
           # Find the first non-comment line (actual key) in hostkey.txt
           KEYLINE=$(grep -v '^#' hostkey.txt | head -n 1)
           if echo "$KEYLINE" | grep -q 'ssh-ed25519'; then
-            KEYTYPE="ed25519"
+            KEYTYPE="ssh-ed25519"
           elif echo "$KEYLINE" | grep -q 'ecdsa'; then
-            KEYTYPE="ecdsa"
+            KEYTYPE="ecdsa-sha2-nistp256"
           elif echo "$KEYLINE" | grep -q 'ssh-rsa'; then
-            KEYTYPE="rsa"
+            KEYTYPE="ssh-rsa"
           else
             echo "ERROR: Unknown key type in hostkey.txt: $KEYLINE"
             cat hostkey.txt
             exit 1
           fi
 
-          # Extract the fingerprint for the detected key type (from the first matching key line)
-          FINGERPRINT=$(ssh-keygen -l -f hostkey.txt | grep -i "$KEYTYPE" | head -n 1 | awk '{print $2}')
-          if [ -z "$FINGERPRINT" ]; then
-            echo "ERROR: Could not extract fingerprint for $KEYTYPE from hostkey.txt"
+          # Extract the full key string for the detected key type
+          FULLKEY=$(grep -v '^#' hostkey.txt | grep "$KEYTYPE" | head -n 1 | awk '{print $1 " " $2}')
+          if [ -z "$FULLKEY" ]; then
+            echo "ERROR: Could not extract full key for $KEYTYPE from hostkey.txt"
             cat hostkey.txt
             exit 1
           fi
 
-          # Add the host key to PuTTY's cache using plink.exe
-          ./plink.exe -ssh -hostkey "$FINGERPRINT" "$SFTP_HOST" exit || true
+          # Add the host key to PuTTY's cache using plink.exe (must use full key string, not fingerprint)
+          ./plink.exe -ssh -hostkey "$FULLKEY" "$SFTP_HOST" exit || true
 
           # Clean up
           rm -f hostkey.txt
