@@ -64,6 +64,14 @@ jobs:
           name: STLGameLauncher-Setup
           path: ${{ env.INSTALLER_PATH }}
 
+      # Debug: Show installer path and list Builds directory before release upload
+      - name: Debug Release Asset Path
+        if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
+        shell: pwsh
+        run: |
+          echo "INSTALLER_PATH: $env:INSTALLER_PATH"
+          Get-ChildItem -Path Builds | Select-Object Name,FullName,Length,LastWriteTime
+
       # Upload to GitHub Releases (only if running on a tag)
       - name: Upload Release Asset
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
