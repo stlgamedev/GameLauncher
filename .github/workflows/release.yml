@@ -55,7 +55,7 @@ jobs:
         run: |
           $file = Get-ChildItem -Path Builds -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             $abs = $file.FullName
-            $rel = $file.FullName.Replace("$pwd\", "")
+            $rel = $file.FullName.Replace("$pwd\", "") -replace '\\','/'
             echo "INSTALLER_PATH=$abs" | Out-File -FilePath $env:GITHUB_ENV -Append
             echo "INSTALLER_PATH_REL=$rel" | Out-File -FilePath $env:GITHUB_ENV -Append
 
