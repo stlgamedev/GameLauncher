@@ -54,7 +54,10 @@ jobs:
         id: find_installer
         run: |
           $file = Get-ChildItem -Path Builds -Filter *.exe | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          echo "INSTALLER_PATH=$($file.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+            $abs = $file.FullName
+            $rel = $file.FullName.Replace("$pwd\", "")
+            echo "INSTALLER_PATH=$abs" | Out-File -FilePath $env:GITHUB_ENV -Append
+            echo "INSTALLER_PATH_REL=$rel" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # Upload as artifact if not a release build
       - name: Upload Installer Artifact
@@ -62,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: STLGameLauncher-Setup
-          path: ${{ env.INSTALLER_PATH }}
+          path: ${{ env.INSTALLER_PATH_REL }}
 
       # Debug: Show installer path and list Builds directory before release upload
       - name: Debug Release Asset Path
@@ -70,6 +73,7 @@ jobs:
         shell: pwsh
         run: |
           echo "INSTALLER_PATH: $env:INSTALLER_PATH"
+            echo "INSTALLER_PATH_REL: $env:INSTALLER_PATH_REL"
           Get-ChildItem -Path Builds | Select-Object Name,FullName,Length,LastWriteTime
 
       # Upload to GitHub Releases (only if running on a tag)
@@ -77,7 +81,7 @@ jobs:
         if: ${{ github.event.inputs.tag || startsWith(github.ref, 'refs/tags/') }}
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ env.INSTALLER_PATH }}
+          files: ${{ env.INSTALLER_PATH_REL }}
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
