@@ -8,7 +8,7 @@ import themes.Theme;
 class Globals
 {
 	public static var APP_VERSION:Int = 1;
-	public static var APP_VERSION_STR:String = "1.1.0";
+	public static var APP_VERSION_STR:String = "1.0.0";
 
 	public static var log:Logger;
 	public static var cfg:Config;

@@ -3,7 +3,7 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://lime.openfl.org/project/1.0.4 http://lime.openfl.org/xsd/project-1.0.4.xsd">
 
-	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="1.1.0"
+	<app title="STLGameLauncher" file="STLGameLauncher" main="Main" version="1.0.0"
 		company="STLGameDev" package="com.axolstudio.stlgamelauncher" />
 	<meta package="com.axolstudio.stlgamelauncher" />
 
