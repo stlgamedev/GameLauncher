@@ -114,20 +114,21 @@ class UpdateSubState extends FlxSubState
 			httpGet(url, function(html)
 			{
 				var bestName:String = null;
-				var bestVer:Int = Globals.APP_VERSION;
-				var re = ~/href="(STLGameLauncher-v(\d+)\.exe)"/ig;
+				var bestVer:Array<Int> = versionToArray(Globals.APP_VERSION_STR);
+				var re = ~/href="(STLGameLauncher-Setup-v([\d_]+)\.exe)"/ig;
 				while (re.match(html))
 				{
 					final name = re.matched(1);
-					final ver = Std.parseInt(re.matched(2));
-					if (ver != null && ver > bestVer)
+					final verStr = re.matched(2);
+					final verArr = versionToArray(verStr);
+					if (compareVersions(verArr, bestVer) > 0)
 					{
-						bestVer = ver;
+						bestVer = verArr;
 						bestName = name;
 					}
 				}
 				if (bestName != null)
-					onResult(bestName, bestVer);
+					onResult(bestName, arrayToVersion(bestVer));
 				else
 					onResult(null, -1);
 			}, onError);
@@ -151,15 +152,16 @@ class UpdateSubState extends FlxSubState
 			httpGet(url, function(html)
 			{
 				var bestName:String = null;
-				var bestVer:Int = Globals.APP_VERSION;
-				var re = ~/href="(STLGameLauncher-v(\d+)\.exe)"/ig;
+				var bestVer:Array<Int> = versionToArray(Globals.APP_VERSION_STR);
+				var re = ~/href="(STLGameLauncher-Setup-v([\d_]+)\.exe)"/ig;
 				while (re.match(html))
 				{
 					final name = re.matched(1);
-					final ver = Std.parseInt(re.matched(2));
-					if (ver != null && ver > bestVer)
+					final verStr = re.matched(2);
+					final verArr = versionToArray(verStr);
+					if (compareVersions(verArr, bestVer) > 0)
 					{
-						bestVer = ver;
+						bestVer = verArr;
 						bestName = name;
 					}
 				}
@@ -168,7 +170,7 @@ class UpdateSubState extends FlxSubState
 					onDone(false);
 					return;
 				}
-				appendStatic('[UPDATE] New APP installer: ' + bestName + ' (server ver ' + bestVer + ')');
+				appendStatic('[UPDATE] New APP installer: ' + bestName + ' (server ver ' + arrayToVersion(bestVer) + ')');
 				final tmp = tempPath(bestName);
 				downloadFile(url + bestName, tmp, function()
 				{
@@ -176,6 +178,42 @@ class UpdateSubState extends FlxSubState
 					runInstallerAndExit(tmp);
 					onDone(true);
 				}, onError);
+// --- Semantic version helpers ---
+static function versionToArray(ver:Dynamic):Array<Int>
+{
+	if (ver == null) return [0];
+	var s = Std.string(ver).replace("_", ".");
+	var parts = s.split(/[._]/);
+	var arr = [];
+	for (p in parts)
+	{
+		var n = Std.parseInt(p);
+		arr.push((n == null) ? 0 : n);
+	}
+	return arr;
+}
+
+static function compareVersions(a:Array<Int>, b:Array<Int>):Int
+{
+	var len = Math.max(a.length, b.length);
+	for (i in 0...len)
+	{
+		var ai = (i < a.length) ? a[i] : 0;
+		var bi = (i < b.length) ? b[i] : 0;
+		if (ai > bi) return 1;
+		if (ai < bi) return -1;
+	}
+	return 0;
+}
+
+static function arrayToVersion(arr:Array<Int>):Int
+{
+	// Return a comparable integer for legacy code (e.g., 1.1.0 => 10100)
+	var v = 0;
+	for (i in 0...arr.length)
+		v = v * 100 + arr[i];
+	return v;
+}
 			}, onError);
 		}
 		catch (e:Dynamic)
@@ -320,8 +358,22 @@ class UpdateSubState extends FlxSubState
 		var i = 0;
 		var total = toDelete.length + toDownload.length;
 		var self = this;
+		var lastDraw = Sys.time();
+		function pumpEvents() {
+			#if !flash
+			try {
+				FlxG.update();
+				FlxG.draw();
+			} catch (_:Dynamic) {}
+			#end
+		}
 		function next()
 		{
+			// Periodically pump events to keep UI responsive
+			if (Sys.time() - lastDraw > 0.2) {
+				pumpEvents();
+				lastDraw = Sys.time();
+			}
 			if (i < toDelete.length)
 			{
 				var file = toDelete[i++];
