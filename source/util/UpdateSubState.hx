@@ -21,6 +21,48 @@ class UpdateSubState extends FlxSubState
 	var onDone:UpdateSubStateCallback;
 	var started:Bool = false;
 
+	// --- Semantic version helpers ---
+	static function versionToArray(ver:Dynamic):Array<Int>
+	{
+		if (ver == null)
+			return [0];
+		var s = Std.string(ver).replace("_", ".");
+		var parts = s.split(".");
+		if (parts.length == 1 && s.indexOf("_") != -1)
+			parts = s.split("_");
+		var arr = [];
+		for (p in parts)
+		{
+			var n = Std.parseInt(p);
+			arr.push((n == null) ? 0 : n);
+		}
+		return arr;
+	}
+
+	static function compareVersions(a:Array<Int>, b:Array<Int>):Int
+	{
+		var len:Int = Math.ceil(Math.max(a.length, b.length));
+		for (i in 0...len)
+		{
+			var ai = (i < a.length) ? a[i] : 0;
+			var bi = (i < b.length) ? b[i] : 0;
+			if (ai > bi)
+				return 1;
+			if (ai < bi)
+				return -1;
+		}
+		return 0;
+	}
+
+	static function arrayToVersion(arr:Array<Int>):Int
+	{
+		// Return a comparable integer for legacy code (e.g., 1.1.0 => 10100)
+		var v = 0;
+		for (i in 0...arr.length)
+			v = v * 100 + arr[i];
+		return v;
+	}
+
 	public function new(mode:UpdateMode, onDone:UpdateSubStateCallback)
 	{
 		super();
@@ -178,42 +220,6 @@ class UpdateSubState extends FlxSubState
 					runInstallerAndExit(tmp);
 					onDone(true);
 				}, onError);
-// --- Semantic version helpers ---
-static function versionToArray(ver:Dynamic):Array<Int>
-{
-	if (ver == null) return [0];
-	var s = Std.string(ver).replace("_", ".");
-	var parts = s.split(/[._]/);
-	var arr = [];
-	for (p in parts)
-	{
-		var n = Std.parseInt(p);
-		arr.push((n == null) ? 0 : n);
-	}
-	return arr;
-}
-
-static function compareVersions(a:Array<Int>, b:Array<Int>):Int
-{
-	var len = Math.max(a.length, b.length);
-	for (i in 0...len)
-	{
-		var ai = (i < a.length) ? a[i] : 0;
-		var bi = (i < b.length) ? b[i] : 0;
-		if (ai > bi) return 1;
-		if (ai < bi) return -1;
-	}
-	return 0;
-}
-
-static function arrayToVersion(arr:Array<Int>):Int
-{
-	// Return a comparable integer for legacy code (e.g., 1.1.0 => 10100)
-	var v = 0;
-	for (i in 0...arr.length)
-		v = v * 100 + arr[i];
-	return v;
-}
 			}, onError);
 		}
 		catch (e:Dynamic)
@@ -359,18 +365,22 @@ static function arrayToVersion(arr:Array<Int>):Int
 		var total = toDelete.length + toDownload.length;
 		var self = this;
 		var lastDraw = Sys.time();
-		function pumpEvents() {
+		function pumpEvents()
+		{
 			#if !flash
-			try {
-				FlxG.update();
-				FlxG.draw();
-			} catch (_:Dynamic) {}
+			try
+			{
+				update(Sys.time() - lastDraw );
+				draw();
+			}
+			catch (_:Dynamic) {}
 			#end
 		}
 		function next()
 		{
 			// Periodically pump events to keep UI responsive
-			if (Sys.time() - lastDraw > 0.2) {
+			if (Sys.time() - lastDraw > 0.2)
+			{
 				pumpEvents();
 				lastDraw = Sys.time();
 			}
