@@ -179,3 +179,4 @@ See `source/themes/Theme.hx` for all supported element types and parameters.
 
 ---
 For more details, see the source code and example configs in the repository.
+
