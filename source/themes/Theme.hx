@@ -1,6 +1,5 @@
 package themes;
 
-
 using StringTools;
 
 typedef ThemeSpec =
@@ -306,7 +305,7 @@ class Theme
 		s.setPosition(x + Std.int((bw - s.width) * 0.5), y + Std.int((bh - s.height) * 0.5));
 	}
 
-	/* --------- token expander %TITLE+1% --------- */
+	/* --------- token expander %TITLE+1% and %PLAYERS% --------- */
 	public static inline function expandWithOffsets(s:String, ctx:Context):String
 	{
 		if (s == null)
@@ -338,7 +337,24 @@ class Theme
 							off = n;
 					}
 					var val = ctx.resolveVar(name, off);
-					out.add(val != null ? val : "");
+					// Special handling for PLAYERS token
+					if (name == "PLAYERS" && val != null)
+					{
+						// Normalize display: "1" => "1 Player", "2" => "2 Players", "1,2" or "1-2" => "1-2 Players"
+						var txt = val.trim();
+						if (txt == "1")
+							out.add("1 Player");
+						else if (txt == "2")
+							out.add("2 Players");
+						else if (txt == "1,2" || txt == "1-2")
+							out.add("1-2 Players");
+						else
+							out.add(txt + " Players");
+					}
+					else
+					{
+						out.add(val != null ? val : "");
+					}
 					i = j + 1;
 					continue;
 				}
@@ -1239,6 +1255,12 @@ private class GenresNode implements IThemeNode
 				icons[i].frames = genreFrames;
 				icons[i].animation.frameName = frameName;
 				icons[i].setGraphicSize(chipW, chipH);
+				// Ensure FlxGraphic is persistent and not destroyed on non-use
+				if (icons[i].graphic != null)
+				{
+					icons[i].graphic.persist = true;
+					icons[i].graphic.destroyOnNoUse = false;
+				}
 			}
 			else
 			{

@@ -16,6 +16,10 @@ class AttractState extends FlxState
 	var videos:Array<String> = [];
 	var vidIdx:Int = -1;
 	var label:FlxText;
+	var demoText:FlxText;
+	var pressAnyText:FlxText;
+	var demoTimer:Float = 0;
+	var pressAnyTimer:Float = 0;
 	#if hxcodec
 	var player:FlxVideo;
 	#end
@@ -29,6 +33,20 @@ class AttractState extends FlxState
 		label.setFormat(null, 24, FlxColor.WHITE, "center");
 		label.y = FlxG.height - 40;
 		add(label);
+
+		// DEMO overlay
+		demoText = new FlxText(0, 0, FlxG.width, "DEMO");
+		demoText.setFormat(null, 72, FlxColor.YELLOW, "center");
+		demoText.y = 120;
+		demoText.alpha = 1;
+		add(demoText);
+
+		// Press Any Key overlay
+		pressAnyText = new FlxText(0, 0, FlxG.width, "Press Any Key");
+		pressAnyText.setFormat(null, 40, FlxColor.WHITE, "center");
+		pressAnyText.y = FlxG.height - 120;
+		pressAnyText.alpha = 1;
+		add(pressAnyText);
 
 		buildVideoList();
 
@@ -65,6 +83,14 @@ class AttractState extends FlxState
 	override public function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
+
+		// Animate DEMO and Press Any Key overlays
+		demoTimer += elapsed;
+		pressAnyTimer += elapsed;
+		// DEMO: fade in/out every 1.2 seconds
+		demoText.alpha = 0.5 + 0.5 * Math.sin(demoTimer * Math.PI / 1.2);
+		// Press Any Key: fade in/out every 0.8 seconds
+		pressAnyText.alpha = 0.5 + 0.5 * Math.sin(pressAnyTimer * Math.PI / 0.8);
 
 		if (anyUserActivity())
 		{

@@ -45,7 +45,10 @@ class GameIndex
 					genres = [];
 				genres.map(function(g:String):String return g.trim());
 				final exeName:Null<String> = Paths.strOrNull(data.exe);
-				games.push(new GameEntry(name, title, devs, desc, year, genres, exeName));
+				var players:Null<String> = null;
+				if (Reflect.hasField(data, "players"))
+					players = Std.string(Reflect.field(data, "players"));
+				games.push(new GameEntry(name, title, devs, desc, year, genres, exeName, players));
 			}
 			catch (_:Dynamic) {}
 		}

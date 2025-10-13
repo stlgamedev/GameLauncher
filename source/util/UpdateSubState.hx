@@ -442,8 +442,65 @@ class UpdateSubState extends FlxSubState
 		try
 			fin.close()
 		catch (_:Dynamic) {}
+
+		// Detect top-level folder
+		var topLevel:String = null;
 		for (e in entries)
-			writeEntry(e, destDir);
+		{
+			var name = e.fileName.replace("\\", "/");
+			while (name.startsWith("/"))
+				name = name.substr(1);
+			if (name.indexOf("..") >= 0)
+				continue;
+			var parts = name.split("/");
+			if (parts.length > 1)
+			{
+				if (topLevel == null)
+					topLevel = parts[0];
+				else if (topLevel != parts[0])
+				{
+					topLevel = null;
+					break;
+				}
+			}
+			else
+			{
+				topLevel = null;
+				break;
+			}
+		}
+
+		for (e in entries)
+		{
+			var name = e.fileName.replace("\\", "/");
+			while (name.startsWith("/"))
+				name = name.substr(1);
+			if (name.indexOf("..") >= 0)
+				continue;
+			var relName = name;
+			if (topLevel != null && relName.startsWith(topLevel + "/"))
+				relName = relName.substr(topLevel.length + 1);
+			if (relName == "")
+				continue;
+			writeEntryWithName(e, destDir, relName);
+		}
+	}
+
+	static function writeEntryWithName(e:haxe.zip.Entry, destDir:String, relName:String):Void
+	{
+		var name = relName;
+		if (name.indexOf("..") >= 0)
+			return;
+		var abs = haxe.io.Path.join([destDir, name]);
+		if (e.fileSize == 0 && e.dataSize == 0 && (name.endsWith("/") || name.endsWith("\\")))
+		{
+			if (!sys.FileSystem.exists(abs))
+				sys.FileSystem.createDirectory(abs);
+			return;
+		}
+		ensureParentDir(abs);
+		var data = haxe.zip.Reader.unzip(e);
+		sys.io.File.saveBytes(abs, data);
 	}
 
 	static function writeEntry(e:haxe.zip.Entry, destDir:String):Void

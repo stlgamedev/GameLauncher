@@ -8,12 +8,14 @@ class GameEntry
 	public var description:String;
 	public var year:Int;
 	public var genres:Array<String>;
+	public var players:Null<String>; // new field
 	public var box(get, null):String;
 	public var cartKey:Null<String>;
 	public var cartPath:Null<String>;
 	public var exe(get, null):String;
 
-	public function new(id:String, title:String, developers:Array<String>, description:String, year:Int, genres:Array<String>, ?exeName:Null<String>)
+	public function new(id:String, title:String, developers:Array<String>, description:String, year:Int, genres:Array<String>, ?exeName:Null<String>,
+			?players:Null<String>)
 	{
 		this.id = id;
 		this.title = title;
@@ -22,6 +24,7 @@ class GameEntry
 		this.year = year;
 		this.genres = genres;
 		this.exe = exeName;
+		this.players = players;
 	}
 
 	function get_box():String

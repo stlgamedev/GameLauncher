@@ -1,6 +1,5 @@
 package util;
 
-
 using StringTools;
 
 /**
@@ -55,6 +54,21 @@ class Config
 
 		var cfg = fromIni(text);
 		finalizePaths(cfg);
+
+		// Force hard-coded controls in kiosk mode
+		if (cfg != null && cfg.mode == "kiosk")
+		{
+			// Player 1: Arrow keys, Period = 'A', Forward Slash (/) = 'B'
+			// Player 2: WASD, ` = 'A', 1 = 'B'
+			cfg.controlsKeys = [
+				"prev" => ["left", "a", "w"],
+				"next" => ["right", "d", "s"],
+				"select" => ["enter", "space", ".", "`", "1"],
+				"back" => ["escape", "/"],
+				"admin_exit" => ["shift+f12"]
+			];
+			// Pads remain unchanged (or could be set to empty)
+		}
 
 		// Check for required fields
 		if (cfg == null || cfg.contentRootDir == null || cfg.serverBase == null || cfg.subscription == null)
