@@ -88,26 +88,33 @@ class UpdateSubState extends FlxSubState
 		if (!started)
 		{
 			started = true;
+			append('[DEBUG] UpdateSubState started, mode=' + Std.string(mode));
 			switch (mode)
 			{
 				case AppUpdate(bestName, bestVer):
+					append('[DEBUG] AppUpdate mode: bestName=' + bestName + ', bestVer=' + bestVer);
 					append('Downloading and running application installer…');
 					checkAndMaybeUpdateApp(function(updated:Bool)
 					{
+						append('[DEBUG] checkAndMaybeUpdateApp callback: updated=' + updated);
 						append('Installer launched, exiting app.');
 						Sys.exit(0);
 					}, function(err:String)
 					{
+						append('[DEBUG] checkAndMaybeUpdateApp error callback');
 						append('[ERROR] App update failed: ' + err);
 						closeAndContinue();
 					});
 				case ContentUpdate(toDelete, toDownload):
+					append('[DEBUG] ContentUpdate mode: toDelete=' + toDelete.length + ', toDownload=' + toDownload.length);
 					startContentUpdate(toDelete, toDownload);
 				case AppUpdateOrContent(subscription):
+					append('[DEBUG] AppUpdateOrContent mode: subscription=' + subscription);
 					// First, check for app update
 					append('Checking for app update…');
 					checkForAppUpdate(function(bestName:String, bestVer:Int)
 					{
+						append('[DEBUG] checkForAppUpdate callback: bestName=' + bestName + ', bestVer=' + bestVer);
 						if (bestName != null)
 						{
 							append('App update found: ' + bestName + ' (ver ' + bestVer + ').');
@@ -120,6 +127,7 @@ class UpdateSubState extends FlxSubState
 						append('No app update needed. Checking for content updates…');
 						buildContentUpdateLists(subscription, function(toDelete:Array<String>, toDownload:Array<String>)
 						{
+							append('[DEBUG] buildContentUpdateLists callback: toDelete=' + toDelete.length + ', toDownload=' + toDownload.length);
 							if (toDelete.length > 0 || toDownload.length > 0)
 							{
 								append('Content update needed.');
@@ -133,11 +141,13 @@ class UpdateSubState extends FlxSubState
 							}
 						}, function(err:String)
 						{
+							append('[DEBUG] buildContentUpdateLists error callback');
 							append('[ERROR] Content update check failed: ' + err);
 							closeAndContinue();
 						});
 					}, function(err:String)
 					{
+						append('[DEBUG] checkForAppUpdate error callback');
 						append('[ERROR] App update check failed: ' + err);
 						closeAndContinue();
 					});
@@ -155,6 +165,8 @@ class UpdateSubState extends FlxSubState
 			final url = base;
 			httpGet(url, function(html)
 			{
+				appendStatic('[DEBUG] Server response for app update check:');
+				appendStatic(html);
 				var bestName:String = null;
 				var bestVer:Array<Int> = versionToArray(Globals.APP_VERSION_STR);
 				var re = ~/href="(STLGameLauncher-Setup-v([\d_]+)\.exe)"/ig;
@@ -250,6 +262,8 @@ class UpdateSubState extends FlxSubState
 			// --- Games ---
 			httpList(subRoot + "games/", function(serverGames)
 			{
+				append('[DEBUG] Server response for games list:');
+				append(Std.string(serverGames));
 				var serverMap = new Map<String, {ver:Int, name:String}>();
 				for (fn in serverGames)
 				{
@@ -291,6 +305,8 @@ class UpdateSubState extends FlxSubState
 				// --- Trailers ---
 				httpList(subRoot + "trailers/", function(serverTrailers)
 				{
+					append('[DEBUG] Server response for trailers list:');
+					append(Std.string(serverTrailers));
 					var serverSet = new Map<String, Bool>();
 					for (fn in serverTrailers)
 						serverSet.set(fn, true);
@@ -312,6 +328,8 @@ class UpdateSubState extends FlxSubState
 					// --- Theme ---
 					httpList(subRoot, function(rootFiles)
 					{
+						append('[DEBUG] Server response for theme/root files list:');
+						append(Std.string(rootFiles));
 						var best:Int = -1;
 						var bestName:String = null;
 						for (fn in rootFiles)
@@ -364,85 +382,101 @@ class UpdateSubState extends FlxSubState
 		var i = 0;
 		var total = toDelete.length + toDownload.length;
 		var self = this;
-		   // Remove manual update/draw pumping. Flixel handles UI updates automatically.
-		   // If you need to keep UI responsive, break up work into async callbacks and avoid blocking loops.
+		// Remove manual update/draw pumping. Flixel handles UI updates automatically.
+		// If you need to keep UI responsive, break up work into async callbacks and avoid blocking loops.
 		function next()
 		{
-			   // No manual event pumping needed. All work is async and UI remains responsive.
-			   if (i < toDelete.length)
-			   {
-				   var file = toDelete[i++];
-				   append('[STEP] Deleting ' + file + '...');
-				   try {
-					   if (sys.FileSystem.exists(file)) {
-						   if (sys.FileSystem.isDirectory(file))
-							   sys.FileSystem.deleteDirectory(file);
-						   else
-							   sys.FileSystem.deleteFile(file);
-						   append('[STEP] Deleted ' + file);
-					   }
-				   } catch (e:Dynamic) {
-					   append('[ERROR] Failed to delete ' + file + ': ' + Std.string(e));
-				   }
-				   // Use haxe.Timer.delay to yield to main loop for UI responsiveness
-				   haxe.Timer.delay(next, 10);
+			// No manual event pumping needed. All work is async and UI remains responsive.
+			if (i < toDelete.length)
+			{
+				var file = toDelete[i++];
+				append('[STEP] Deleting ' + file + '...');
+				try
+				{
+					if (sys.FileSystem.exists(file))
+					{
+						if (sys.FileSystem.isDirectory(file))
+							sys.FileSystem.deleteDirectory(file);
+						else
+							sys.FileSystem.deleteFile(file);
+						append('[STEP] Deleted ' + file);
+					}
+				}
+				catch (e:Dynamic)
+				{
+					append('[ERROR] Failed to delete ' + file + ': ' + Std.string(e));
+				}
+				   // [TEMP DEBUG] Commented out async event pumping for troubleshooting
+				   // haxe.Timer.delay(next, 10);
+				   next();
 				   return;
-			   }
-			   if (i - toDelete.length < toDownload.length)
-			   {
-				   var idx = i - toDelete.length;
-				   var url = toDownload[idx];
-				   var dest = getLocalPathForDownload(url);
-				   append('[STEP] Downloading ' + url + '...');
-				   downloadFile(url, dest, function()
-				   {
-					   append('[STEP] Downloaded ' + dest);
-					   // Unzip ANY zip file after download, write .version, then delete zip
-					   if (dest.toLowerCase().endsWith('.zip'))
-					   {
-						   append('[STEP] Unpacking zip...');
-						   try {
-							   var base = null;
-							   var ver = null;
-							   var m = ~/^(.*?)-v(\d+)\.zip$/i;
-							   var fname = haxe.io.Path.withoutDirectory(haxe.io.Path.normalize(dest));
-							   if (m.match(fname)) {
-								   base = m.matched(1);
-								   ver = Std.parseInt(m.matched(2));
-							   }
-							   var outDir = null;
-							   if (url.indexOf('/games/') != -1 && base != null)
-								   outDir = haxe.io.Path.join([haxe.io.Path.directory(dest), base]);
-							   else if (url.toLowerCase().indexOf('theme-v') != -1)
-								   outDir = haxe.io.Path.directory(dest);
-							   if (outDir != null) {
-								   unzipTo(dest, outDir);
-								   append('[STEP] Unpacked zip.');
-								   // Write .version file
-								   if (ver != null) {
-									   var versionFile = haxe.io.Path.join([outDir, ".version"]);
-									   sys.io.File.saveContent(versionFile, Std.string(ver));
-								   }
-								   // Delete zip after extraction
-								   try sys.FileSystem.deleteFile(dest) catch (_:Dynamic) {}
-							   }
-						   } catch (e:Dynamic) {
-							   append('[ERROR] Failed to unpack zip: ' + Std.string(e));
-						   }
-					   }
-					   i++;
-					   // Use haxe.Timer.delay to yield to main loop for UI responsiveness
-					   haxe.Timer.delay(next, 10);
-				   }, function(err:String)
-				   {
-					   append('[ERROR] Failed to download ' + url + ': ' + err);
-					   i++;
-					   haxe.Timer.delay(next, 10);
-				   });
-				   return;
-			   }
-			   append('[STEP] Content update complete.');
-			   closeAndContinue();
+			}
+			if (i - toDelete.length < toDownload.length)
+			{
+				var idx = i - toDelete.length;
+				var url = toDownload[idx];
+				var dest = getLocalPathForDownload(url);
+				append('[STEP] Downloading ' + url + '...');
+				downloadFile(url, dest, function()
+				{
+					append('[STEP] Downloaded ' + dest);
+					// Unzip ANY zip file after download, write .version, then delete zip
+					if (dest.toLowerCase().endsWith('.zip'))
+					{
+						append('[STEP] Unpacking zip...');
+						try
+						{
+							var base = null;
+							var ver = null;
+							var m = ~/^(.*?)-v(\d+)\.zip$/i;
+							var fname = haxe.io.Path.withoutDirectory(haxe.io.Path.normalize(dest));
+							if (m.match(fname))
+							{
+								base = m.matched(1);
+								ver = Std.parseInt(m.matched(2));
+							}
+							var outDir = null;
+							if (url.indexOf('/games/') != -1 && base != null)
+								outDir = haxe.io.Path.join([haxe.io.Path.directory(dest), base]);
+							else if (url.toLowerCase().indexOf('theme-v') != -1)
+								outDir = haxe.io.Path.directory(dest);
+							if (outDir != null)
+							{
+								unzipTo(dest, outDir);
+								append('[STEP] Unpacked zip.');
+								// Write .version file
+								if (ver != null)
+								{
+									var versionFile = haxe.io.Path.join([outDir, ".version"]);
+									sys.io.File.saveContent(versionFile, Std.string(ver));
+								}
+								// Delete zip after extraction
+								try
+									sys.FileSystem.deleteFile(dest)
+								catch (_:Dynamic) {}
+							}
+						}
+						catch (e:Dynamic)
+						{
+							append('[ERROR] Failed to unpack zip: ' + Std.string(e));
+						}
+					}
+					i++;
+					   // [TEMP DEBUG] Commented out async event pumping for troubleshooting
+					   // haxe.Timer.delay(next, 10);
+					   next();
+				}, function(err:String)
+				{
+					append('[ERROR] Failed to download ' + url + ': ' + err);
+					i++;
+					   // [TEMP DEBUG] Commented out async event pumping for troubleshooting
+					   // haxe.Timer.delay(next, 10);
+					   next();
+				});
+				return;
+			}
+			append('[STEP] Content update complete.');
+			closeAndContinue();
 		}
 		next(); // All work is async, UI will remain responsive
 		#else
