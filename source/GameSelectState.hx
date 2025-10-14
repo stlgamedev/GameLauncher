@@ -190,7 +190,7 @@ class GameSelectState extends FlxState
 					case "DESC": (g.description != null) ? g.description : "";
 					case "BOX": (g.box != null) ? g.box : "";
 					case "CART": (g.cartPath != null) ? g.cartPath : (g.box != null ? g.box : "");
-					case "PLAYERS": ""; // not in GameEntry yet; leave blank so the UI doesn't break
+					case "PLAYERS": (Reflect.hasField(g, "players") && g.players != null) ? g.players : "";
 					default: "";
 				}
 			}
