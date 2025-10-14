@@ -364,116 +364,87 @@ class UpdateSubState extends FlxSubState
 		var i = 0;
 		var total = toDelete.length + toDownload.length;
 		var self = this;
-		var lastDraw = Sys.time();
-		function pumpEvents()
-		{
-			#if !flash
-			try
-			{
-				update(Sys.time() - lastDraw );
-				draw();
-			}
-			catch (_:Dynamic) {}
-			#end
-		}
+		   // Remove manual update/draw pumping. Flixel handles UI updates automatically.
+		   // If you need to keep UI responsive, break up work into async callbacks and avoid blocking loops.
 		function next()
 		{
-			// Periodically pump events to keep UI responsive
-			if (Sys.time() - lastDraw > 0.2)
-			{
-				pumpEvents();
-				lastDraw = Sys.time();
-			}
-			if (i < toDelete.length)
-			{
-				var file = toDelete[i++];
-				append('Deleting ' + file + '...');
-				try
-				{
-					if (sys.FileSystem.exists(file))
-					{
-						if (sys.FileSystem.isDirectory(file))
-							sys.FileSystem.deleteDirectory(file);
-						else
-							sys.FileSystem.deleteFile(file);
-						append('Deleted ' + file);
-					}
-				}
-				catch (e:Dynamic)
-				{
-					append('[ERROR] Failed to delete ' + file + ': ' + Std.string(e));
-				}
-				next();
-				return;
-			}
-			if (i - toDelete.length < toDownload.length)
-			{
-				var idx = i - toDelete.length;
-				var url = toDownload[idx];
-				var dest = getLocalPathForDownload(url);
-				append('Downloading ' + url + '...');
-				downloadFile(url, dest, function()
-				{
-					append('Downloaded ' + dest);
-					// Unzip ANY zip file after download, write .version, then delete zip
-					if (dest.toLowerCase().endsWith('.zip'))
-					{
-						append('Unpacking zip...');
-						try
-						{
-							var base = null;
-							var ver = null;
-							var m = ~/^(.*?)-v(\d+)\.zip$/i;
-							var fname = haxe.io.Path.withoutDirectory(haxe.io.Path.normalize(dest));
-							if (m.match(fname))
-							{
-								base = m.matched(1);
-								ver = Std.parseInt(m.matched(2));
-							}
-							var outDir = null;
-							if (url.indexOf('/games/') != -1 && base != null)
-							{
-								outDir = haxe.io.Path.join([haxe.io.Path.directory(dest), base]);
-							}
-							else if (url.toLowerCase().indexOf('theme-v') != -1)
-							{
-								outDir = haxe.io.Path.directory(dest);
-							}
-							if (outDir != null)
-							{
-								unzipTo(dest, outDir);
-								append('Unpacked zip.');
-								// Write .version file
-								if (ver != null)
-								{
-									var versionFile = (url.indexOf('/games/') != -1) ? haxe.io.Path.join([outDir, ".version"]) : haxe.io.Path.join([outDir, ".version"]);
-									sys.io.File.saveContent(versionFile, Std.string(ver));
-								}
-								// Delete zip after extraction
-								try
-									sys.FileSystem.deleteFile(dest)
-								catch (_:Dynamic) {}
-							}
-						}
-						catch (e:Dynamic)
-						{
-							append('[ERROR] Failed to unpack zip: ' + Std.string(e));
-						}
-					}
-					i++;
-					next();
-				}, function(err:String)
-				{
-					append('[ERROR] Failed to download ' + url + ': ' + err);
-					i++;
-					next();
-				});
-				return;
-			}
-			append('Content update complete.');
-			closeAndContinue();
+			   // No manual event pumping needed. All work is async and UI remains responsive.
+			   if (i < toDelete.length)
+			   {
+				   var file = toDelete[i++];
+				   append('[STEP] Deleting ' + file + '...');
+				   try {
+					   if (sys.FileSystem.exists(file)) {
+						   if (sys.FileSystem.isDirectory(file))
+							   sys.FileSystem.deleteDirectory(file);
+						   else
+							   sys.FileSystem.deleteFile(file);
+						   append('[STEP] Deleted ' + file);
+					   }
+				   } catch (e:Dynamic) {
+					   append('[ERROR] Failed to delete ' + file + ': ' + Std.string(e));
+				   }
+				   // Use haxe.Timer.delay to yield to main loop for UI responsiveness
+				   haxe.Timer.delay(next, 10);
+				   return;
+			   }
+			   if (i - toDelete.length < toDownload.length)
+			   {
+				   var idx = i - toDelete.length;
+				   var url = toDownload[idx];
+				   var dest = getLocalPathForDownload(url);
+				   append('[STEP] Downloading ' + url + '...');
+				   downloadFile(url, dest, function()
+				   {
+					   append('[STEP] Downloaded ' + dest);
+					   // Unzip ANY zip file after download, write .version, then delete zip
+					   if (dest.toLowerCase().endsWith('.zip'))
+					   {
+						   append('[STEP] Unpacking zip...');
+						   try {
+							   var base = null;
+							   var ver = null;
+							   var m = ~/^(.*?)-v(\d+)\.zip$/i;
+							   var fname = haxe.io.Path.withoutDirectory(haxe.io.Path.normalize(dest));
+							   if (m.match(fname)) {
+								   base = m.matched(1);
+								   ver = Std.parseInt(m.matched(2));
+							   }
+							   var outDir = null;
+							   if (url.indexOf('/games/') != -1 && base != null)
+								   outDir = haxe.io.Path.join([haxe.io.Path.directory(dest), base]);
+							   else if (url.toLowerCase().indexOf('theme-v') != -1)
+								   outDir = haxe.io.Path.directory(dest);
+							   if (outDir != null) {
+								   unzipTo(dest, outDir);
+								   append('[STEP] Unpacked zip.');
+								   // Write .version file
+								   if (ver != null) {
+									   var versionFile = haxe.io.Path.join([outDir, ".version"]);
+									   sys.io.File.saveContent(versionFile, Std.string(ver));
+								   }
+								   // Delete zip after extraction
+								   try sys.FileSystem.deleteFile(dest) catch (_:Dynamic) {}
+							   }
+						   } catch (e:Dynamic) {
+							   append('[ERROR] Failed to unpack zip: ' + Std.string(e));
+						   }
+					   }
+					   i++;
+					   // Use haxe.Timer.delay to yield to main loop for UI responsiveness
+					   haxe.Timer.delay(next, 10);
+				   }, function(err:String)
+				   {
+					   append('[ERROR] Failed to download ' + url + ': ' + err);
+					   i++;
+					   haxe.Timer.delay(next, 10);
+				   });
+				   return;
+			   }
+			   append('[STEP] Content update complete.');
+			   closeAndContinue();
 		}
-		next();
+		next(); // All work is async, UI will remain responsive
 		#else
 		append('Content update not supported on this platform.');
 		closeAndContinue();
