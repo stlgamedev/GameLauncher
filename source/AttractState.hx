@@ -7,9 +7,9 @@ import flixel.util.FlxColor;
 import flixel.util.FlxTimer;
 import haxe.io.Path;
 import sys.FileSystem;
-#if hxcodec
+
 import hxcodec.flixel.FlxVideo;
-#end
+
 
 class AttractState extends FlxState
 {
@@ -20,9 +20,9 @@ class AttractState extends FlxState
 	var pressAnyText:FlxText;
 	var demoTimer:Float = 0;
 	var pressAnyTimer:Float = 0;
-	#if hxcodec
+	
 	var player:FlxVideo;
-	#end
+
 
 	override public function create():Void
 	{
@@ -50,7 +50,6 @@ class AttractState extends FlxState
 
 		buildVideoList();
 
-		#if hxcodec
 		if (videos.length == 0)
 		{
 			label.text = "No trailers found in: " + util.Paths.trailersDir();
@@ -58,25 +57,24 @@ class AttractState extends FlxState
 			new FlxTimer().start(1.0, _ -> FlxG.switchState(() -> new GameSelectState()));
 			return;
 		}
-		startNextVideo();
-		#else
-		label.text = "hxCodec not available on this target.";
-		new FlxTimer().start(1.0, _ -> FlxG.switchState(() -> new GameSelectState()));
-		#end
+		
+
+
 	}
 
 	override public function destroy():Void
 	{
-		#if hxcodec
+		
 		if (player != null)
 		{
 			try
 				player.stop()
 			catch (_:Dynamic) {}
-			remove(player, true);
+			
+			player.dispose();
 			player = null;
 		}
-		#end
+		
 		super.destroy();
 	}
 
@@ -94,12 +92,12 @@ class AttractState extends FlxState
 
 		if (anyUserActivity())
 		{
-			#if hxcodec
+			
 			if (player != null)
 				try
 					player.stop()
 				catch (_:Dynamic) {}
-			#end
+			
 			FlxG.switchState(() -> new GameSelectState());
 			return;
 		}
@@ -129,7 +127,7 @@ class AttractState extends FlxState
 		vidIdx = -1;
 	}
 
-	#if hxcodec
+	
 	function startNextVideo():Void
 	{
 		if (videos.length == 0)
@@ -154,27 +152,16 @@ class AttractState extends FlxState
 			try
 				player.stop()
 			catch (_:Dynamic) {}
-			remove(player, true);
+			player.dispose();
 			player = null;
 		}
 
 		player = new FlxVideo();
-		player.load(path, true); // true = loop in codec; we'll still advance manually on complete for robustness
-		player.onEndReached = () -> // when the file finishes, move on
-		{
-			startNextVideo();
-		};
-
-		// Fullscreen to the state camera
-		player.x = 0;
-		player.y = 0;
-		player.setGraphicSize(FlxG.width, FlxG.height);
-		player.updateHitbox();
-
-		add(player);
-		player.play();
+		player.onEndReached.add(() -> startNextVideo());
+		player.play(path, false); // true = loop in codec; we'll still advance manually on complete for robustness
+		
 	}
-	#end
+	
 
 	inline function anyUserActivity():Bool
 	{
