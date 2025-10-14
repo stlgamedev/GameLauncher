@@ -57,6 +57,7 @@ class AttractState extends FlxState
 			new FlxTimer().start(1.0, _ -> FlxG.switchState(() -> new GameSelectState()));
 			return;
 		}
+		startNextVideo();
 		
 
 

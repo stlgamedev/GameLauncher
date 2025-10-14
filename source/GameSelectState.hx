@@ -190,7 +190,14 @@ class GameSelectState extends FlxState
 					case "DESC": (g.description != null) ? g.description : "";
 					case "BOX": (g.box != null) ? g.box : "";
 					case "CART": (g.cartPath != null) ? g.cartPath : (g.box != null ? g.box : "");
-					case "PLAYERS": (Reflect.hasField(g, "players") && g.players != null) ? g.players : "";
+					case "PLAYERS":
+						var val = (Reflect.hasField(g, "players") && g.players != null) ? Std.string(g.players) : "";
+						val = val.trim();
+						if (val == "1") return "1 Player";
+						else if (val == "2") return "2 Players";
+						else if (val == "1,2" || val == "1-2") return "1-2 Players";
+						else if (val != "") return val + " Players";
+						else return "";
 					default: "";
 				}
 			}
