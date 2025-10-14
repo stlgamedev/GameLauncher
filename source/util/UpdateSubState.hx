@@ -170,7 +170,7 @@ class UpdateSubState extends FlxSubState
 				var bestName:String = null;
 				var bestVer:Array<Int> = versionToArray(Globals.APP_VERSION_STR);
 				var re = ~/href="(STLGameLauncher-Setup-v([\d_]+)\.exe)"/ig;
-				while (re.match(html))
+				if (re.match(html))
 				{
 					final name = re.matched(1);
 					final verStr = re.matched(2);
@@ -406,10 +406,10 @@ class UpdateSubState extends FlxSubState
 				{
 					append('[ERROR] Failed to delete ' + file + ': ' + Std.string(e));
 				}
-				   // [TEMP DEBUG] Commented out async event pumping for troubleshooting
-				   // haxe.Timer.delay(next, 10);
-				   next();
-				   return;
+				// [TEMP DEBUG] Commented out async event pumping for troubleshooting
+				// haxe.Timer.delay(next, 10);
+				next();
+				return;
 			}
 			if (i - toDelete.length < toDownload.length)
 			{
@@ -462,16 +462,16 @@ class UpdateSubState extends FlxSubState
 						}
 					}
 					i++;
-					   // [TEMP DEBUG] Commented out async event pumping for troubleshooting
-					   // haxe.Timer.delay(next, 10);
-					   next();
+					// [TEMP DEBUG] Commented out async event pumping for troubleshooting
+					// haxe.Timer.delay(next, 10);
+					next();
 				}, function(err:String)
 				{
 					append('[ERROR] Failed to download ' + url + ': ' + err);
 					i++;
-					   // [TEMP DEBUG] Commented out async event pumping for troubleshooting
-					   // haxe.Timer.delay(next, 10);
-					   next();
+					// [TEMP DEBUG] Commented out async event pumping for troubleshooting
+					// haxe.Timer.delay(next, 10);
+					next();
 				});
 				return;
 			}
