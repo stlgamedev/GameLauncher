@@ -7,9 +7,7 @@ import flixel.util.FlxColor;
 import flixel.util.FlxTimer;
 import haxe.io.Path;
 import sys.FileSystem;
-
-import hxcodec.flixel.FlxVideo;
-
+import hxcodec.flixel.FlxVideoSprite;
 
 class AttractState extends FlxState
 {
@@ -20,9 +18,8 @@ class AttractState extends FlxState
 	var pressAnyText:FlxText;
 	var demoTimer:Float = 0;
 	var pressAnyTimer:Float = 0;
-	
-	var player:FlxVideo;
 
+	var videoSprite:FlxVideoSprite;
 
 	override public function create():Void
 	{
@@ -32,50 +29,43 @@ class AttractState extends FlxState
 		label = new FlxText(0, 0, FlxG.width, "");
 		label.setFormat(null, 24, FlxColor.WHITE, "center");
 		label.y = FlxG.height - 40;
-		add(label);
-
-		// DEMO overlay
-		demoText = new FlxText(0, 0, FlxG.width, "DEMO");
-		demoText.setFormat(null, 72, FlxColor.YELLOW, "center");
-		demoText.y = 120;
-		demoText.alpha = 1;
-		add(demoText);
-
-		// Press Any Key overlay
-		pressAnyText = new FlxText(0, 0, FlxG.width, "Press Any Key");
-		pressAnyText.setFormat(null, 40, FlxColor.WHITE, "center");
-		pressAnyText.y = FlxG.height - 120;
-		pressAnyText.alpha = 1;
-		add(pressAnyText);
 
 		buildVideoList();
 
 		if (videos.length == 0)
 		{
 			label.text = "No trailers found in: " + util.Paths.trailersDir();
+			add(label);
 			// After a brief pause, go back
 			new FlxTimer().start(1.0, _ -> FlxG.switchState(() -> new GameSelectState()));
 			return;
 		}
+
 		startNextVideo();
-		
 
+		// Add overlays after video for correct layering
+		add(label);
+		demoText = new FlxText(0, 0, FlxG.width, "DEMO");
+		demoText.setFormat(null, 72, FlxColor.YELLOW, "center");
+		demoText.y = 120;
+		demoText.alpha = 1;
+		add(demoText);
 
+		pressAnyText = new FlxText(0, 0, FlxG.width, "Press Any Key");
+		pressAnyText.setFormat(null, 40, FlxColor.WHITE, "center");
+		pressAnyText.y = FlxG.height - 120;
+		pressAnyText.alpha = 1;
+		add(pressAnyText);
 	}
 
 	override public function destroy():Void
 	{
-		
-		if (player != null)
+		if (videoSprite != null)
 		{
-			try
-				player.stop()
-			catch (_:Dynamic) {}
-			
-			player.dispose();
-			player = null;
+			videoSprite.destroy();
+			remove(videoSprite);
+			videoSprite = null;
 		}
-		
 		super.destroy();
 	}
 
@@ -93,12 +83,11 @@ class AttractState extends FlxState
 
 		if (anyUserActivity())
 		{
-			
-			if (player != null)
+			if (videoSprite != null)
 				try
-					player.stop()
+					videoSprite.stop()
 				catch (_:Dynamic) {}
-			
+			videoSprite = null;
 			FlxG.switchState(() -> new GameSelectState());
 			return;
 		}
@@ -128,7 +117,6 @@ class AttractState extends FlxState
 		vidIdx = -1;
 	}
 
-	
 	function startNextVideo():Void
 	{
 		if (videos.length == 0)
@@ -136,7 +124,6 @@ class AttractState extends FlxState
 		vidIdx++;
 		if (vidIdx >= videos.length)
 		{
-			// reshuffle each pass to keep it fresh
 			FlxG.random.shuffle(videos);
 			vidIdx = 0;
 		}
@@ -147,22 +134,22 @@ class AttractState extends FlxState
 	{
 		label.text = ""; // clear any messages
 
-		// Stop and remove existing player
-		if (player != null)
+		if (videoSprite != null)
 		{
-			try
-				player.stop()
-			catch (_:Dynamic) {}
-			player.dispose();
-			player = null;
+			videoSprite.destroy();
+			remove(videoSprite);
+			videoSprite = null;
 		}
 
-		player = new FlxVideo();
-		player.onEndReached.add(() -> startNextVideo());
-		player.play(path, false); // true = loop in codec; we'll still advance manually on complete for robustness
-		
+		videoSprite = new FlxVideoSprite();
+		videoSprite.bitmap.onEndReached.add(() -> startNextVideo());
+		videoSprite.play(path, false);
+		videoSprite.bitmap.volume = Std.int(FlxG.sound.volume * 100);
+		videoSprite.x = 0;
+		videoSprite.y = 0;
+		videoSprite.setGraphicSize(FlxG.width, FlxG.height);
+		add(videoSprite); // Add before overlays for correct layering
 	}
-	
 
 	inline function anyUserActivity():Bool
 	{
