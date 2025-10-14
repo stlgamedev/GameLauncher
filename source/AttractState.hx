@@ -143,11 +143,18 @@ class AttractState extends FlxState
 
 		videoSprite = new FlxVideoSprite();
 		videoSprite.bitmap.onEndReached.add(() -> startNextVideo());
+		videoSprite.bitmap.onTextureSetup.add(() -> {
+			var videoW = videoSprite.bitmap.bitmapData.width;
+			var videoH = videoSprite.bitmap.bitmapData.height;
+			var screenW = FlxG.width;
+			var screenH = FlxG.height;
+			var scale = Math.min(screenW / videoW, screenH / videoH);
+			videoSprite.setGraphicSize(Std.int(videoW * scale), Std.int(videoH * scale));
+			videoSprite.x = Std.int((screenW - videoSprite.width) / 2);
+			videoSprite.y = Std.int((screenH - videoSprite.height) / 2);
+		});
 		videoSprite.play(path, false);
 		videoSprite.bitmap.volume = Std.int(FlxG.sound.volume * 100);
-		videoSprite.x = 0;
-		videoSprite.y = 0;
-		videoSprite.setGraphicSize(FlxG.width, FlxG.height);
 		add(videoSprite); // Add before overlays for correct layering
 	}
 
