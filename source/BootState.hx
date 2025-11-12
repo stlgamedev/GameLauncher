@@ -1,6 +1,6 @@
 import util.GameIndex;
 #if sys
-import haxe.io.Path;
+import haxe.io.Path as HxPath;
 import sys.FileSystem;
 import sys.io.File;
 #end
@@ -43,7 +43,6 @@ class BootState extends FlxState
 	{
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
-		FlxG.mouse.visible = FlxG.mouse.enabled = false;
 
 		label = new FlxText(0, Std.int(FlxG.height * 0.60), FlxG.width, "Loading…");
 		label.setFormat(null, 24, FlxColor.WHITE, "center");
@@ -100,6 +99,26 @@ class BootState extends FlxState
 					Log.line("[BOOT][ERROR] No config found, created default.");
 					Sys.exit(1);
 				}
+
+				// Debug-time override: when running a debug build on desktop (e.g. from VS Code),
+				// allow using an alternate externals directory to avoid repeated downloads.
+				// Priority: environment variable LAUNCHER_EXTERNALS, otherwise default to E:\\LauncherExternals
+				#if sys
+				#if debug
+				try
+				{
+					var devExt = Sys.getEnv("LAUNCHER_EXTERNALS");
+					if (devExt == null || devExt == "")
+						devExt = "E:\\LauncherExternals";
+					if (devExt != null && devExt != "")
+					{
+						Globals.log.line("[BOOT] Debug override: using external path: " + devExt);
+						Globals.cfg.contentRootDir = util.Config.normalizePath(devExt);
+					}
+				}
+				catch (_:Dynamic) {}
+				#end
+				#end
 				#if sys
 				syncKioskScheduledTask(Globals.cfg.mode);
 				#end
@@ -134,6 +153,7 @@ class BootState extends FlxState
 			case 3:
 				// Scan games
 				Globals.games = GameIndex.scanGames();
+				// Loaded games enumerated
 				if (Globals.games.length == 0)
 					Log.line("[BOOT][ERROR] No games found.");
 				stepDone("Scan games");
@@ -150,10 +170,8 @@ class BootState extends FlxState
 				stepDone("Load theme");
 
 			case 5:
-				final frameAbs = Path.join([Globals.theme.dir, "cart_frame.png"]);
 				final frameAbs = HxPath.join([Globals.theme.dir, "cart_frame.png"]);
-				// Log only if cart frame is missing
-				CartBake.TARGET_WIDTH = 200; // tweakable
+				CartBake.TARGET_WIDTH = 200;
 				CartBake.buildAll(Globals.games, frameAbs);
 				stepDone("Bake carts");
 
@@ -189,7 +207,7 @@ class BootState extends FlxState
 				var cutoff = 30 * 24 * 60 * 60 * 1000;
 				for (f in FileSystem.readDirectory(logDir))
 				{
-					var abs = Path.join([logDir, f]);
+					var abs = HxPath.join([logDir, f]);
 					try
 					{
 						var stat = FileSystem.stat(abs);

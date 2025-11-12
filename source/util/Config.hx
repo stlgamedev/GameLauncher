@@ -37,8 +37,23 @@ class Config
 	{
 		if (!FileSystem.exists(CFG_FILE))
 		{
-			Log.line("[CFG][ERROR] settings.cfg is missing.");
-			return null;
+			// Create a default settings.cfg when missing so clean builds still run.
+			try
+			{
+				var defaultsCfg = defaults();
+				// Per-request: in dev/test recreate the settings.cfg with externals pointing
+				// to E:\\LauncherExternals and attract timeout (menu) set to 10 seconds.
+				defaultsCfg.contentRootDir = "E:\\LauncherExternals";
+				defaultsCfg.idleSecondsMenu = 10;
+				var ini = toIni(defaultsCfg);
+				sys.io.File.saveContent(CFG_FILE, ini);
+				Log.line("[CFG] Created default settings.cfg for testing: " + CFG_FILE);
+			}
+			catch (e:Dynamic)
+			{
+				Log.line("[CFG][ERROR] Failed to create default settings.cfg: " + Std.string(e));
+				return null;
+			}
 		}
 
 		var text = "";
@@ -55,19 +70,22 @@ class Config
 		var cfg = fromIni(text);
 		finalizePaths(cfg);
 
-		// Force hard-coded controls in kiosk mode
+		// If kiosk mode and no Controls.Keys were provided in the INI, apply
+		// reasonable kiosk defaults. If the INI contains Controls.Keys, honor them
+		// so kiosk controls are configurable via settings.cfg.
 		if (cfg != null && cfg.mode == "kiosk")
 		{
-			// Player 1: Arrow keys, Period = 'A', Forward Slash (/) = 'B'
-			// Player 2: WASD, ` = 'A', 1 = 'B'
-			cfg.controlsKeys = [
-				"prev" => ["left", "a", "w"],
-				"next" => ["right", "d", "s"],
-				"select" => ["enter", "space", ".", "`", "1"],
-				"back" => ["escape", "/"],
-				"admin_exit" => ["shift+f12"]
-			];
-			// Pads remain unchanged (or could be set to empty)
+			if (!hasControlsKeys(cfg))
+			{
+				// Player 1: Arrow keys; Player 2: WASD; select/back include console keys
+				cfg.controlsKeys = [
+					"prev" => ["left", "a", "w"],
+					"next" => ["right", "d", "s"],
+					"select" => ["enter", "space", ".", "`", "1"],
+					"back" => ["escape", "/"],
+					"admin_exit" => ["shift+f12"]
+				];
+			}
 		}
 
 		// Check for required fields
@@ -198,6 +216,14 @@ class Config
 		m.set(key.toLowerCase(), a);
 	}
 
+	static function hasControlsKeys(c:Config):Bool
+	{
+		if (c.controlsKeys == null) return false;
+		for (k in c.controlsKeys.keys())
+			return true;
+		return false;
+	}
+
 	static function finalizePaths(c:Config):Void
 	{
 		c.contentRootDir = normalizePath(c.contentRootDir);
@@ -284,4 +310,46 @@ class Config
 		var full = isAbs ? p : Path.normalize(Sys.getCwd() + "/" + p);
 		return Path.normalize(full);
 	}
+
+	static function toIni(c:Config):String
+	{
+		var sb = new StringBuf();
+		sb.add("[General]\r\n");
+		sb.add("mode = " + c.mode + "\r\n");
+		sb.add("subscription = " + c.subscription + "\r\n");
+		sb.add("idle_seconds_menu = " + Std.string(c.idleSecondsMenu) + "\r\n");
+		sb.add("idle_seconds_game = " + Std.string(c.idleSecondsGame) + "\r\n\r\n");
+		sb.add("[Paths]\r\n");
+		sb.add("content_root = " + c.contentRootDir + "\r\n");
+		sb.add("logs_root = " + c.logsRoot + "\r\n\r\n");
+		sb.add("[Update]\r\n");
+		sb.add("update_on_launch = " + (c.updateOnLaunch ? "true" : "false") + "\r\n");
+		sb.add("server_base = " + c.serverBase + "\r\n");
+
+		// Controls (keys)
+		if (c.controlsKeys != null)
+		{
+			sb.add("\r\n[Controls.Keys]\r\n");
+			for (k in c.controlsKeys.keys())
+			{
+				var arr = c.controlsKeys.get(k);
+				if (arr == null) continue;
+				sb.add(k + " = " + arr.join(",") + "\r\n");
+			}
+		}
+
+		// Controls (pads)
+		if (c.controlsPads != null)
+		{
+			sb.add("\r\n[Controls.Pads]\r\n");
+			for (k in c.controlsPads.keys())
+			{
+				var arr = c.controlsPads.get(k);
+				if (arr == null) continue;
+				sb.add(k + " = " + arr.join(",") + "\r\n");
+			}
+		}
+			return sb.toString();
+	}
+
 }

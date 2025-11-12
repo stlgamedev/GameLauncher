@@ -57,10 +57,22 @@ class LaunchState extends FlxState
 		var boxPath = game.box;
 		if (boxPath != null && FileSystem.exists(boxPath))
 		{
-			try {
-				var bd = BitmapData.fromFile(boxPath);
-				splash.loadGraphic(bd);
-			} catch (_:Dynamic) {}
+			// Use FlxG.bitmap cache instead of loading directly
+			var graphic:FlxGraphic = FlxG.bitmap.get(boxPath);
+			if (graphic == null)
+			{
+				try {
+					var bd = BitmapData.fromFile(boxPath);
+					graphic = FlxG.bitmap.add(bd, false, boxPath);
+					if (graphic != null)
+					{
+						graphic.persist = true;
+						graphic.destroyOnNoUse = false;
+					}
+				} catch (_:Dynamic) {}
+			}
+			if (graphic != null)
+				splash.loadGraphic(graphic);
 		}
 		splash.antialiasing = true;
 		add(splash);

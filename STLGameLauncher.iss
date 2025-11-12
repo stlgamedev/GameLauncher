@@ -90,7 +90,7 @@ begin
 
   L := TLabel.Create(PageOptions);
   L.Parent := PageOptions.Surface;
-  L.Caption := 'Idle time before attract mode (in-game):';
+  L.Caption := 'Time to terminate idle game and return to menu (seconds):';
   L.Top := EditIdleMenu.Top + EditIdleMenu.Height + 12;
   L.Left := 0;
 
@@ -106,7 +106,7 @@ begin
 
   L := TLabel.Create(PagePaths);
   L.Parent := PagePaths.Surface;
-  L.Caption := 'Content root (contains games/, trailers/, theme/):';
+  L.Caption := 'Content root (contains games/ and theme/):';
   L.Top := 8;
   L.Left := 0;
 
@@ -210,6 +210,22 @@ begin
       '[Update]'#13#10 +
       'update_on_launch = ' + UpdateOnLaunch + #13#10 +
       'server_base = ' + ServerBase + #13#10;
+
+    // Controls defaults (normal mode). Kiosk mode will override at runtime.
+    IniText := IniText + #13#10 +
+      '[Controls.Keys]'#13#10 +
+      'prev = left,a'#13#10 +
+      'next = right,d'#13#10 +
+      'select = enter,space,comma,slash'#13#10 +
+      'back = escape'#13#10 +
+      'admin_exit = shift+f12'#13#10 +
+      #13#10 +
+      '[Controls.Pads]'#13#10 +
+      'prev = pad_left'#13#10 +
+      'next = pad_right'#13#10 +
+      'select = pad_a,pad_start'#13#10 +
+      'back = pad_select'#13#10 +
+      'admin_exit = '#13#10;
 
     SaveStringToFile(IniPath, IniText, False);
 

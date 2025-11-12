@@ -17,6 +17,9 @@ class Main extends Sprite
 		{
 			super();
 
+			// Install global crash logger to capture uncaught errors where possible
+			try { util.CrashLogger.install(); } catch (_:Dynamic) {}
+
 			var wantUpdate = false;
 			#if sys
 			for (a in Sys.args())

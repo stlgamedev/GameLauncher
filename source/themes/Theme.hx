@@ -306,7 +306,7 @@ class Theme
 	}
 
 	/* --------- token expander %TITLE+1% and %PLAYERS% --------- */
-	public static inline function expandWithOffsets(s:String, ctx:Context):String
+	public static function expandWithOffsets(s:String, ctx:Context):String
 	{
 		if (s == null)
 			return null;
@@ -337,24 +337,10 @@ class Theme
 							off = n;
 					}
 					var val = ctx.resolveVar(name, off);
-					// Special handling for PLAYERS token
-					if (name == "PLAYERS" && val != null)
-					{
-						// Normalize display: "1" => "1 Player", "2" => "2 Players", "1,2" or "1-2" => "1-2 Players"
-						var txt = val.trim();
-						if (txt == "1")
-							out.add("1 Player");
-						else if (txt == "2")
-							out.add("2 Players");
-						else if (txt == "1,2" || txt == "1-2")
-							out.add("1-2 Players");
-						else
-							out.add(txt + " Players");
-					}
-					else
-					{
-						out.add(val != null ? val : "");
-					}
+					// Default behavior: append the resolved value (or empty string if null).
+					// Avoid appending the literal "null" by converting null -> "".
+					// (no debug logging here)
+					out.add(val != null ? val : "");
 					i = j + 1;
 					continue;
 				}

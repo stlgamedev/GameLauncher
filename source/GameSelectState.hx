@@ -20,6 +20,9 @@ class GameSelectState extends FlxState
 		super.create();
 		FlxG.cameras.bgColor = 0xFF000000;
 
+		if (Globals.games != null && Globals.games.length > 0)
+			selected = FlxG.random.int(0, Globals.games.length - 1);
+
 		theme = (Globals.theme != null) ? Globals.theme : themes.Theme.load("external/themes/arcade-jam-2017");
 		theme.buildInto(this);
 
@@ -67,7 +70,7 @@ class GameSelectState extends FlxState
 			idleMenuTimer += elapsed;
 			if (Globals.cfg != null && idleMenuTimer >= Globals.cfg.idleSecondsMenu)
 			{
-				FlxG.switchState(() -> new AttractState());
+				FlxG.switchState(() -> new DvdAttractState());
 			}
 			return;
 		}
@@ -169,6 +172,7 @@ class GameSelectState extends FlxState
 				if (idx < 0)
 					idx += n;
 				var g = Globals.games[idx];
+				// PLAYERS resolver runs here
 
 				// --- dynamic GENREn support ---
 				// %GENRE1%, %GENRE2%, %GENRE3%, ... (1-based indices)
@@ -191,13 +195,19 @@ class GameSelectState extends FlxState
 					case "BOX": (g.box != null) ? g.box : "";
 					case "CART": (g.cartPath != null) ? g.cartPath : (g.box != null ? g.box : "");
 					case "PLAYERS":
-						var val = (Reflect.hasField(g, "players") && g.players != null) ? Std.string(g.players) : "";
-						val = val.trim();
-						if (val == "1") return "1 Player";
-						else if (val == "2") return "2 Players";
-						else if (val == "1,2" || val == "1-2") return "1-2 Players";
-						else if (val != "") return val + " Players";
-						else return "";
+						// Prefer the typed GameEntry field (Games are loaded into GameEntry objects
+						// in GameIndex). This avoids reflection issues and ensures the parsed
+						// 'players' string is used directly.
+						if (g == null) return "";
+						var entry:util.GameEntry = cast g;
+						var ps:Null<String> = entry.players;
+						if (ps == null) return "";
+						var s = ps.trim();
+						if (s == "") return "";
+						if (s == "1") return "1 Player";
+						if (s == "2") return "2 Players";
+						if (s == "1,2" || s == "1-2" || s == "1 - 2") return "1 - 2 Players";
+						return s + " Players";
 					default: "";
 				}
 			}

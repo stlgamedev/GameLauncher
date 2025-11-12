@@ -11,7 +11,7 @@ using StringTools;
  **/
 class Paths
 {
-	/** Root for content (games/trailers/theme). Falls back to "external". */
+	/** Root for content (games/theme). Falls back to "external". */
 	public static function contentRoot():String
 	{
 		var root = (Globals.cfg != null && Globals.cfg.contentRootDir != null && Globals.cfg.contentRootDir != "") ? Globals.cfg.contentRootDir : "external";
@@ -29,9 +29,6 @@ class Paths
 	public static inline function gamesDir():String
 		return Path.join([contentRoot(), "games"]);
 
-	public static inline function trailersDir():String
-		return Path.join([contentRoot(), "trailers"]);
-
 	public static inline function themeDir():String
 		return Path.join([contentRoot(), "theme"]);
 
@@ -46,7 +43,6 @@ class Paths
 	{
 		ensureDir(contentRoot());
 		ensureDir(gamesDir());
-		ensureDir(trailersDir());
 		ensureDir(themeDir());
 	}
 

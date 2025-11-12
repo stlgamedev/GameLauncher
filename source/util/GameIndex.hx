@@ -48,7 +48,8 @@ class GameIndex
 				var players:Null<String> = null;
 				if (Reflect.hasField(data, "players"))
 					players = Std.string(Reflect.field(data, "players"));
-				games.push(new GameEntry(name, title, devs, desc, year, genres, exeName, players));
+				var entry = new GameEntry(name, title, devs, desc, year, genres, exeName, players);
+				games.push(entry);
 			}
 			catch (_:Dynamic) {}
 		}

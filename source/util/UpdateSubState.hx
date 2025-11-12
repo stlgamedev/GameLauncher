@@ -239,7 +239,6 @@ class UpdateSubState extends FlxSubState
 			final subRoot = base + ensureSlash(subscription);
 			final localRoot = Globals.cfg.contentRootDir;
 			final gamesLocal = haxe.io.Path.join([localRoot, "games"]);
-			final trailersLocal = haxe.io.Path.join([localRoot, "trailers"]);
 			final themesLocal = haxe.io.Path.join([localRoot, "theme"]);
 
 			var toDelete:Array<String> = [];
@@ -284,33 +283,12 @@ class UpdateSubState extends FlxSubState
 						toDownload.push(subRoot + "games/" + serverMap.get(base).name);
 				}
 
-				// --- Trailers ---
-				httpList(subRoot + "trailers/", function(serverTrailers)
+				// --- Theme ---
+				httpList(subRoot, function(rootFiles)
 				{
-					var serverSet = new Map<String, Bool>();
-					for (fn in serverTrailers)
-						serverSet.set(fn, true);
-					var localSet = new Map<String, Bool>();
-					if (sys.FileSystem.exists(trailersLocal))
-					{
-						for (lf in sys.FileSystem.readDirectory(trailersLocal))
-							localSet.set(lf, true);
-					}
-					// ToDelete: local trailers not on server
-					for (lf in localSet.keys())
-						if (!serverSet.exists(lf))
-							toDelete.push(haxe.io.Path.join([trailersLocal, lf]));
-					// ToDownload: server trailers not local
-					for (fn in serverSet.keys())
-						if (!localSet.exists(fn))
-							toDownload.push(subRoot + "trailers/" + fn);
-
-					// --- Theme ---
-					httpList(subRoot, function(rootFiles)
-					{
-						var best:Int = -1;
-						var bestName:String = null;
-						for (fn in rootFiles)
+					var best:Int = -1;
+					var bestName:String = null;
+					for (fn in rootFiles)
 						{
 							var m = ~/^theme-v(\d+)\.zip$/i;
 							if (m.match(fn))
@@ -335,12 +313,11 @@ class UpdateSubState extends FlxSubState
 							}
 							catch (_:Dynamic) {}
 						}
-						// ToDownload: new theme zip
-						if (best > localBest && bestName != null)
-							toDownload.push(subRoot + bestName);
+					// ToDownload: new theme zip
+					if (best > localBest && bestName != null)
+						toDownload.push(subRoot + bestName);
 
-						onResult(toDelete, toDownload);
-					}, onError);
+					onResult(toDelete, toDownload);
 				}, onError);
 			}, onError);
 		}
@@ -459,8 +436,6 @@ class UpdateSubState extends FlxSubState
 		var localRoot = Globals.cfg.contentRootDir;
 		if (url.indexOf('/games/') != -1)
 			return haxe.io.Path.join([localRoot, 'games', url.substr(url.lastIndexOf('/') + 1)]);
-		if (url.indexOf('/trailers/') != -1)
-			return haxe.io.Path.join([localRoot, 'trailers', url.substr(url.lastIndexOf('/') + 1)]);
 		if (url.toLowerCase().indexOf('theme-v') != -1)
 			return haxe.io.Path.join([localRoot, 'theme', url.substr(url.lastIndexOf('/') + 1)]);
 		return haxe.io.Path.join([localRoot, url.substr(url.lastIndexOf('/') + 1)]);
