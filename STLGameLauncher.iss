@@ -218,8 +218,7 @@ begin
       'next = right,d'#13#10 +
       'select = enter,space,comma,slash'#13#10 +
       'back = escape'#13#10 +
-      'admin_exit = shift+f12'#13#10 +
-      #13#10 +
+      'admin_exit = shift+f12'#13#10#13#10 +
       '[Controls.Pads]'#13#10 +
       'prev = pad_left'#13#10 +
       'next = pad_right'#13#10 +
