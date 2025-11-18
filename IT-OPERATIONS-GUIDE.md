@@ -2,8 +2,6 @@
 
 **This system is designed to run automatically with ZERO maintenance needed.**
 
-You should never have to touch this. But just in case, here's what to know:
-
 ---
 
 ## 🟢 Normal Operation
@@ -13,8 +11,6 @@ When the computer boots, the launcher starts automatically and runs in fullscree
 - Switch to screensaver mode when idle
 - Auto-restart if it crashes
 - Keep running forever
-
-**You don't need to do anything.** Just leave it alone.
 
 ---
 
@@ -26,7 +22,7 @@ If a game gets stuck or you need to force-quit:
 
 This immediately kills the current game and returns to the menu. Works from anywhere.
 
-If that doesn't work: **Just restart the computer.**
+If that doesn't work: **Restart the computer.**
 
 The launcher will start back up automatically.
 
@@ -62,19 +58,3 @@ Only call if:
 **Installation Location:** `C:\Program Files\STLGameLauncher`  
 **Game Content:** `C:\ProgramData\STLGameLauncher\external`  
 **Logs:** `C:\ProgramData\STLGameLauncher\logs`
-
-**Network:** This system does NOT require internet access. Everything runs offline from the local install.
-
----
-
-## ✅ Quick Checklist
-
-- ✅ Computer boots → Launcher starts automatically
-- ✅ Idle for a while → Screensaver kicks in
-- ✅ Press any key → Back to menu
-- ✅ Game stuck → `Shift+F12` to force-quit
-- ✅ Launcher crashing → Disable task, call us
-
----
-
-**That's it.** This thing runs itself. You probably won't ever need this guide, but now you have it just in case.
