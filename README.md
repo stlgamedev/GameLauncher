@@ -1,182 +1,365 @@
 # STL GameLauncher
 
-## 1. Installation
+Fullscreen game launcher built for arcade cabinets and kiosk installations. Features automatic crash recovery, idle monitoring, and a DVD-style attract mode with starfield and floating screenshots.
 
-Download the latest `STLGameLauncher-Setup-<version>.exe` from the [GitHub Releases](https://github.com/stlgamedev/GameLauncher/releases). Run the installer and follow the prompts. By default, the launcher will install to `C:\Program Files\STLGameLauncher` and create a desktop shortcut.
+**Current Version:** 1.1.0
 
-## 2. Configuration Prompts Explained
+---
 
-On first launch, you'll be prompted to configure the launcher. These settings are saved in `settings.cfg` in the app directory.
+## Installation
 
-**General Section:**
-- `mode`: `normal` (default) or `kiosk` (locked-down mode)
-- `subscription`: The content pack to use (e.g., `arcade-jam-2018`)
-- `idle_seconds_menu`: Seconds of inactivity before attract mode starts
-- `idle_seconds_game`: Seconds of inactivity before a running game is killed
+Grab the latest `STLGameLauncher-Setup-v<version>.exe` from [GitHub Releases](https://github.com/stlgamedev/GameLauncher/releases) and run it. The installer will walk you through configuration and drop everything in `C:\Program Files\STLGameLauncher` by default.
 
-**Paths Section:**
-- `content_root`: Directory for external content (games, themes, etc.)
-- `logs_root`: Directory for log files
+### Normal vs Kiosk Mode
 
-**Update Section:**
-- `update_on_launch`: If `true`, launcher checks for updates on startup
-- `server_base`: URL for update server
+The launcher runs in one of two modes, configured in `settings.cfg`:
 
+**Normal Mode** — Standard desktop application behavior:
+- Runs like a regular program
+- Uses keyboard/gamepad controls defined in config
+- NO auto-restart on crash
+- NO auto-start on login
+- You manually launch it when you want to use it
 
-**Controls.Keys / Controls.Pads:**
-- Map launcher actions to keyboard or gamepad buttons (e.g., `prev`, `next`, `select`, `back`, `admin_exit`)
+**Kiosk Mode** — Locked-down unattended operation for arcade cabinets:
+- Auto-starts on Windows login via scheduled task (`STLGameLauncherKiosk`)
+- Auto-restarts on crash (up to 3 times per minute via the scheduled task)
+- Hard-coded arcade controls (ignores config file control settings)
+- Enforces idle timeouts for games
+- Designed to run 24/7 without human intervention
 
-### Kiosk Mode Controls (Arcade Cabinet)
+---
 
-When running in `kiosk` mode, the launcher will use hard-coded controls to match the arcade cabinet button layout. These controls override any settings in `settings.cfg`:
+## Configuration
 
-**Player 1:**
-- Arrow keys for movement
-- Period (`.`) for 'A' button
-- Forward Slash (`/`) for 'B' button
+Settings live in `settings.cfg` in the install directory. You can edit this manually if needed.
 
-**Player 2:**
-- WASD for movement
-- Backtick (<code>`</code>) for 'A' button
-- Number 1 (`1`) for 'B' button
+### General
 
-**Escape:**
-- Central button for exiting (mapped to `Escape` key)
+```ini
+[General]
+mode = kiosk
+subscription = arcade-jam-2018
+idle_seconds_menu = 180
+idle_seconds_game = 300
+```
 
-These mappings ensure all games and launcher actions work seamlessly with the physical arcade controls.
+- `mode` — `normal` or `kiosk`
+- `subscription` — Content pack name
+- `idle_seconds_menu` — Inactivity timeout before attract mode kicks in
+- `idle_seconds_game` — Inactivity timeout before killing an idle game
 
-## 3. How Subscriptions Work
+### Paths
 
-A subscription is a content pack (games, themes, assets) identified by a unique name (e.g., `arcade-jam-2018`). The launcher loads the subscription specified in `settings.cfg`. Each subscription can have its own games and theme.
+```ini
+[Paths]
+content_root = C:\ProgramData\STLGameLauncher\external
+logs_root = C:\ProgramData\STLGameLauncher\logs
+```
 
-## 4. Game Configuration
+- `content_root` — Where games, themes, and assets live
+- `logs_root` — Where logs are written (auto-cleaned after 30 days)
 
-Each game in a subscription must be placed in its own folder under the games directory (e.g., `external/games/<game-id>/`).
+### Updates
 
-**Folder Naming:**
-- The folder name (`<game-id>`) should be unique and match the `id` field in the game's `game.json` file.
-- Example: `external/games/mygame2025/`
+```ini
+[Update]
+update_on_launch = true
+server_base = https://sgd.axolstudio.com/
+```
 
-**Required Files in Each Game Folder:**
-- `game.json` — Metadata describing the game (see below for format)
-- Game executable (e.g., `game.exe`) — The file specified by the `exe` field in `game.json`
-- `box.png` — Box art image for the game
-- `.version` — Plain text file with the current integer version (used for updates)
-- Any additional assets (manuals, screenshots, etc.)
+- `update_on_launch` — Check for updates on startup
+- `server_base` — Update server URL
 
-**Sample game.json layout:**
+### Controls
+
+```ini
+[Controls.Keys]
+select = enter,space
+prev = left,a
+next = right,d
+back = escape
+admin_exit = shift+f12
+
+[Controls.Pads]
+select = pad_a,pad_start
+prev = pad_left
+next = pad_right
+back = pad_select
+```
+
+**Note:** Kiosk mode overrides these settings with hard-coded arcade controls and ignores the config file.
+
+**Admin hotkey:** `Shift+F12` force-kills the current game and returns to the menu from anywhere. This works in both Normal and Kiosk mode.
+
+---
+
+## Attract Mode
+
+After sitting idle for `idle_seconds_menu` (configured in settings), the launcher switches to attract mode — a screensaver showing game screenshots and prompting visitors to press Start.
+
+Press any key or button to return to the menu.
+
+---
+
+## Subscriptions
+
+A subscription is a content pack that includes games, a theme, and all associated assets. The launcher loads whatever subscription is specified in the `subscription` field in `settings.cfg`.
+
+### How Updates Work
+
+If `update_on_launch = true` in your config, the launcher checks for new content on startup by connecting to the update server specified in `server_base`.
+
+The server organizes content by subscription name:
+
+```
+https://sgd.axolstudio.com/
+└── arcade-jam-2018/
+    ├── games/
+    │   ├── mygame-v1.zip
+    │   ├── mygame-v2.zip
+    │   └── anothergame-v1.zip
+    └── theme/
+        └── default-theme-v1.zip
+```
+
+The launcher compares the version numbers in the zip filenames against local `.version` files for each game and theme. If the server has a newer version, it downloads and extracts it automatically.
+
+**For offline installations:** Set `update_on_launch = false` and manually copy game/theme folders to the appropriate directories. No network required.
+
+---
+
+## Game Configuration
+
+Each game lives in its own folder under `<content_root>/games/<game-id>/` with these required files:
+
+```
+external/games/mygame2025/
+├── game.json        (metadata)
+├── game.exe         (executable)
+├── box.png          (box art for menu)
+└── .version         (version number, auto-created)
+```
+
+### game.json Format
+
+This file tells the launcher everything about your game:
 
 ```json
 {
-	"id": "mygame2025",
-	"title": "My Game Title",
-	"developers": ["Studio Name"],
-	"description": "Short description of the game.",
-	"year": 2025,
-	"genres": ["action", "puzzle"],
-	"exe": "game.exe",
-	"players": "1,2" // Add this field for player count
+  "id": "mygame2025",
+  "title": "My Game Title",
+  "developers": ["Studio Name", "Another Dev"],
+  "description": "Short description that appears in the menu.",
+  "year": 2025,
+  "genres": ["action", "puzzle"],
+  "exe": "game.exe",
+  "players": "1,2"
 }
 ```
 
-**Player Count Field:**
-- `"players": "1"` — 1-player game
-- `"players": "2"` — 2-player game only
-- `"players": "1,2"` or `"players": "1-2"` — supports 1 or 2 players
+**Field Breakdown:**
+- `id` — Unique identifier. **MUST match the folder name exactly.**
+- `title` — Display name shown in the menu
+- `developers` — Array of developer/studio names (can be multiple)
+- `description` — Brief description (shown in menu if theme supports it)
+- `year` — Release year
+- `genres` — Array of genre tags (e.g., `["action", "rpg", "platformer"]`)
+- `exe` — Name of the executable file (relative to game folder)
+- `players` — Player count:
+  - `"1"` = 1 player only
+  - `"2"` = 2 players only
+  - `"1,2"` = 1 or 2 players
+  - `"1-2"` = 1 to 2 players (displayed differently by some themes)
 
-You can display the player count in your theme using the `%PLAYERS%` token in a text element's `content` field. For example:
+### Box Art (`box.png`)
 
-```json
-{
-	"name": "playerCount",
-	"type": "text",
-	"pos": "w-180,120",
-	"size": "160,40",
-	"color": "#FFD700",
-	"pointSize": 24,
-	"content": "%PLAYERS%"
-}
-```
+The menu displays this image for each game. Recommended size is 512x512 or larger. The launcher will scale it to fit the theme layout.
 
-This will show "1 Player", "2 Players", or "1-2 Players" based on the game's `players` field.
+### Packaging Games for Updates
 
-**How the Launcher Uses These Files:**
-- The launcher scans all subfolders in `external/games/` and loads games with a valid `game.json`.
-- The `id` field in `game.json` must match the folder name.
-- The launcher uses `box.png` for display, and launches the executable specified in `exe`.
-- The `.version` file is used for update checks (see above).
-- All other assets are optional but can be referenced in the theme or game metadata.
+When packaging games for server distribution, create a zip file named `<game-id>-v<version>.zip`:
 
-## 4.2. Packaging Games for Updates (Zip Files)
-
-To enable automatic updates, each game must have a zip file hosted on the update server. The launcher will download and extract these zips as needed.
-
-**How to Package a Game Zip:**
-- The zip filename must follow the format: `<game-id>-v<version>.zip` (e.g., `mygame2025-v3.zip`)
-- The `<version>` is an integer and should match what will be written to the `.version` file after extraction.
-- The contents of the zip should be a single top-level folder named `<game-id>`, containing all game files.
-
-**Example zip structure:**
 ```
 mygame2025-v3.zip
 └── mygame2025/
-	├── game.json
-	├── game.exe
-	├── box.png
-	└── ...other assets...
+    ├── game.json
+    ├── game.exe
+    ├── box.png
+    └── (any other game files)
 ```
 
-When the launcher downloads and extracts the zip:
-- It creates a folder named `<game-id>` in the games directory (e.g., `external/games/mygame2025/`).
-- All files from the top-level folder in the zip are placed directly in that folder.
-- The launcher writes the version number to `.version` inside the game folder after extraction.
-- The zip file is deleted after extraction.
+**Important:** The top-level folder inside the zip MUST match the `id` in `game.json`.
 
-**Server Setup:**
-- Upload each zip to the server in the appropriate subscription folder (e.g., `/games/` under the subscription root).
-- The launcher will compare the local `.version` to the highest version zip available and download/extract if needed.
+**Update Process:**
+1. Launcher checks server for `<game-id>-v*.zip` files
+2. Compares version number to local `.version` file
+3. If server version is newer, downloads and extracts to `<content_root>/games/<game-id>/`
+4. Writes new version number to `.version`
+5. Deletes the downloaded zip file
 
-**Update Flow:**
-- When a new version is released, increment the version number in the zip filename and in the game files.
-- The launcher will extract the zip, write the new version to `.version`, and remove the zip file after extraction.
+---
 
-## 5. Creating a New Theme for a Subscription
+## Theme Configuration
 
-Themes are stored in `external/theme/<theme-id>/` and must include a `theme.json` file describing the layout and elements.
+Themes control the visual layout and live in `external/theme/<theme-id>/`.
 
-**Required files:**
-- `theme.json`: Theme specification (see below)
-- Any referenced assets (images, fonts, sounds)
+```
+external/theme/vortex-theme/
+├── theme.json
+└── ...assets...
+```
 
-**Sample theme.json layout:**
+### theme.json
+
 ```json
 {
-	"id": "vortex-theme",
-	"name": "Vortex Theme",
-	"elements": [
-		{
-			"name": "titleText",
-			"type": "text",
-			"pos": "w/2,40",
-			"size": "600,80",
-			"color": "#FFFFFF",
-			"pointSize": 48,
-			"content": "%TITLE%"
-		},
-		{
-			"name": "background",
-			"type": "graphic",
-			"source": "bg.png",
-			"pos": "0,0",
-			"size": "w,h"
-		}
-		// ... more elements ...
-	]
+  "id": "vortex-theme",
+  "name": "Vortex Theme",
+  "elements": [
+    {
+      "name": "titleText",
+      "type": "text",
+      "pos": "w/2,40",
+      "size": "600,80",
+      "color": "#FFFFFF",
+      "pointSize": 48,
+      "content": "%TITLE%"
+    }
+  ]
 }
 ```
 
-See `source/themes/Theme.hx` for all supported element types and parameters.
+### Variable Tokens
+
+Use these in text `content` fields:
+
+- `%TITLE%` — Game title
+- `%YEAR%` — Release year
+- `%DEVS%` — Developers (comma-separated)
+- `%GENRES%` — Genres (bullet-separated)
+- `%DESC%` — Description
+- `%PLAYERS%` — "1 Player", "2 Players", or "1-2 Players"
+- `%BOX%` — Box art path
+- `%CART%` — Cart image path
+- `%GENRE1%`, `%GENRE2%`, etc. — Individual genres by 1-based index
+
+Check `source/themes/Theme.hx` for full element documentation.
 
 ---
-For more details, see the source code and example configs in the repository.
 
+## Crash Recovery
+
+The launcher has multiple layers of crash protection:
+
+### Application-Level Auto-Restart (Both Modes)
+
+If the launcher crashes, it catches the exception, logs the error with a full stack trace, and attempts to restart itself. This works in both Normal and Kiosk mode.
+
+### Kiosk Mode Scheduled Task (Kiosk Only)
+
+In Kiosk mode, the installer creates a Windows scheduled task called `STLGameLauncherKiosk` that:
+- Runs on user login
+- Monitors the launcher process
+- Automatically restarts it if it exits for any reason
+- Limits restarts to 3 attempts per minute (prevents infinite crash loops)
+
+**This scheduled task is NOT created in Normal mode** — crashes in Normal mode will attempt one self-restart, then exit if that fails.
+
+### Emergency Stop (Kiosk Mode)
+
+If you get stuck in a crash loop in Kiosk mode and need to stop the auto-restart behavior:
+
+1. Open Task Scheduler (`Win+R` → `taskschd.msc`)
+2. Find `STLGameLauncherKiosk` in the task list
+3. Right-click → **Disable**
+
+Or via command line:
+```cmd
+schtasks /Change /TN "STLGameLauncherKiosk" /DISABLE
+```
+
+This stops the scheduled task from restarting the launcher. You can then investigate the logs to see what's causing the crashes.
+
+---
+
+## Logging
+
+Logs go to `<logs_root>/gl-YYYYMMDD.log` and include:
+- Startup/shutdown
+- Game launches and session times
+- Update checks
+- Errors and stack traces
+- Idle timeouts
+
+Logs older than 30 days are auto-deleted on startup.
+
+**View recent log:**
+```cmd
+scripts\tail_latest_log.cmd
+```
+
+---
+
+## Analytics
+
+Usage stats are tracked locally in `<content_root>/analytics/usage.json`:
+
+```json
+{
+  "mygame2025": {
+    "count": 42,
+    "lastPlayed": 1699564823000,
+    "totalSeconds": 12847.5
+  }
+}
+```
+
+- `count` — Launch count
+- `lastPlayed` — UTC timestamp (ms)
+- `totalSeconds` — Total playtime
+
+This data never leaves the machine.
+
+---
+
+## Creating Releases
+
+1. Update the version number in `Project.xml`
+2. Commit your changes
+3. Run `scripts\create_release_tag.cmd`
+4. GitHub Actions automatically builds the installer and publishes the release
+
+If a release build fails and you need to retry, use `scripts\retry_release_tag.cmd` to delete and recreate the tag.
+
+---
+
+## Troubleshooting
+
+### Launcher won't start
+- Check `logs/gl-<date>.log` for errors
+- Verify `settings.cfg` is valid
+- Make sure `content_root` exists and is accessible
+
+### Games won't launch
+- Verify `game.json` is valid and `exe` field is correct
+- Check game executable permissions
+- Review logs
+
+### Updates failing
+- Check `server_base` URL
+- Verify network connectivity
+- Review logs for HTTP errors
+
+### Crash loop
+See "Emergency Stop" in Crash Recovery section above.
+
+---
+
+## License
+
+See `LICENSE` file.
+
+---
+
+**Issues:** https://github.com/stlgamedev/GameLauncher/issues
