@@ -3,7 +3,8 @@
 Fullscreen game launcher built for arcade cabinets and kiosk installations. Features automatic crash recovery, idle monitoring, and a DVD-style attract mode with starfield and floating screenshots.
 
 **Current Version:** 1.1.0
-[![Latest Build](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml)
+
+[![Latest Build](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml/badge.svg)](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml)
 
 ---
 
