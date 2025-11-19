@@ -4,7 +4,7 @@ Fullscreen game launcher built for arcade cabinets and kiosk installations. Feat
 
 **Current Version:** 1.1.0
 
-[![Build and Release Windows Installer](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml)
+[![Latest Build](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/stlgamedev/GameLauncher/actions/workflows/release.yml)
 
 ---
 
